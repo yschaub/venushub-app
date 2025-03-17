@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import Document from '@tiptap/extension-document';
@@ -113,13 +114,13 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>((props
       
       // Remove each found annotation
       for (const {from, to} of annotations.reverse()) { // Process in reverse to maintain position integrity
-        editor.chain()
-          .focus()
-          .unsetMark('annotation', {from, to})
-          .run();
+        // We need to set the selection to the annotation range first
+        editor.commands.setTextSelection({ from, to });
+        // Then unset the mark within that selection
+        editor.commands.unsetMark('annotation');
       }
       
-      editor.chain().focus().run();
+      editor.commands.focus();
     },
     getAnnotations: () => {
       if (!editor) return [];
