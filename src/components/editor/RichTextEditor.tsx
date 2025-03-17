@@ -27,6 +27,7 @@ export interface RichTextEditorProps {
 
 export interface RichTextEditorRef {
   addAnnotation: (content: string) => void;
+  removeAnnotation: (id: string) => void;
   getAnnotations: () => AnnotationMark[];
   getHTML: () => string;
   getJSON: () => any;
@@ -89,6 +90,38 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>((props
       editor.chain().focus()
         .setAnnotation({ content: annotationContent })
         .run();
+    },
+    removeAnnotation: (id: string) => {
+      if (!editor) return;
+      
+      // Find all occurrences of the annotation with the given ID
+      const annotations: {from: number; to: number}[] = [];
+      editor.state.doc.descendants((node, pos) => {
+        const marks = node.marks.filter(mark => 
+          mark.type.name === 'annotation' && 
+          mark.attrs.id === id
+        );
+        
+        if (marks.length > 0 && node.isText) {
+          annotations.push({
+            from: pos,
+            to: pos + node.nodeSize
+          });
+        }
+        
+        return true;
+      });
+      
+      // Remove each found annotation
+      for (const {from, to} of annotations.reverse()) { // Process in reverse to maintain position integrity
+        editor.chain()
+          .focus()
+          .removeTextStyle({from, to})
+          .unsetMark('annotation', {from, to})
+          .run();
+      }
+      
+      editor.chain().focus().run();
     },
     getAnnotations: () => {
       if (!editor) return [];

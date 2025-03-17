@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -160,6 +161,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
 
   const handleDeleteAnnotation = async (annotationId: string) => {
     try {
+      // Remove from database if in edit mode
       if (mode === 'edit' && entryId) {
         const { error } = await supabase
           .from('journal_entry_annotations')
@@ -169,10 +171,12 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
         if (error) throw error;
       }
       
+      // Remove from local state
       setAnnotations(annotations.filter(a => a.id !== annotationId));
       
+      // Remove from editor content - this is the key change
       if (editorRef.current) {
-        editorRef.current.scrollToAnnotation(annotationId);
+        editorRef.current.removeAnnotation(annotationId);
       }
       
       toast({
