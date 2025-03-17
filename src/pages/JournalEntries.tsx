@@ -27,7 +27,8 @@ const JournalEntries: React.FC = () => {
         
         const { data: tagsData, error: tagsError } = await supabase
           .from('system_tags')
-          .select('*');
+          .select('*')
+          .order('name');
           
         if (tagsError) throw tagsError;
 

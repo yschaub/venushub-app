@@ -19,7 +19,8 @@ const CreateJournalEntry: React.FC = () => {
         setIsLoading(true);
         const { data: tagsData, error: tagsError } = await supabase
           .from('system_tags')
-          .select('*');
+          .select('*')
+          .order('name');
           
         if (tagsError) throw tagsError;
         setTags(tagsData);

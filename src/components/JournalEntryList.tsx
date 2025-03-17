@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 interface Tag {
   id: string;
   name: string;
+  category: string;
 }
 
 interface JournalEntry {
@@ -54,6 +55,25 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
     return tag ? tag.name : 'Unknown';
   };
 
+  const getTagCategory = (tagId: string) => {
+    const tag = tags.find(t => t.id === tagId);
+    return tag ? tag.category : 'Unknown';
+  };
+
+  const getCategoryColor = (category: string) => {
+    const categoryColors: { [key: string]: string } = {
+      'Planets': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+      'Event': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+      'Sign': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+      'Aspect': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+      'Direction': 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300',
+      'Cycle': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+      'Houses': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
+    };
+    
+    return categoryColors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+  };
+
   return (
     <div className="space-y-4">
       {entries.map(entry => (
@@ -90,7 +110,11 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
           {entry.tags && entry.tags.length > 0 && (
             <CardFooter className="pt-0 flex flex-wrap gap-2">
               {entry.tags.map(tagId => (
-                <Badge key={tagId} variant="secondary">
+                <Badge 
+                  key={tagId} 
+                  variant="outline"
+                  className={`${getCategoryColor(getTagCategory(tagId))} border-0`}
+                >
                   {getTagName(tagId)}
                 </Badge>
               ))}

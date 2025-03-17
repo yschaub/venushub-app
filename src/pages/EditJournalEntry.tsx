@@ -43,7 +43,8 @@ const EditJournalEntry: React.FC = () => {
         // Fetch all available tags
         const { data: tagsData, error: tagsError } = await supabase
           .from('system_tags')
-          .select('*');
+          .select('*')
+          .order('name');
           
         if (tagsError) throw tagsError;
         

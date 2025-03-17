@@ -133,16 +133,19 @@ export type Database = {
       }
       system_tags: {
         Row: {
+          category: Database["public"]["Enums"]["tag_category"]
           created_at: string
           id: string
           name: string
         }
         Insert: {
+          category: Database["public"]["Enums"]["tag_category"]
           created_at?: string
           id?: string
           name: string
         }
         Update: {
+          category?: Database["public"]["Enums"]["tag_category"]
           created_at?: string
           id?: string
           name?: string
@@ -157,7 +160,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      tag_category:
+        | "Planets"
+        | "Event"
+        | "Sign"
+        | "Aspect"
+        | "Direction"
+        | "Cycle"
+        | "Houses"
     }
     CompositeTypes: {
       [_ in never]: never

@@ -10,10 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import AnnotationSidebar from '@/components/AnnotationSidebar';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Accordion, AccordionContent, AccordionItem,  AccordionTrigger } from '@/components/ui/accordion';
 
 interface Tag {
   id: string;
   name: string;
+  category: string;
 }
 
 interface Annotation {
@@ -61,6 +64,20 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   const [showAnnotationForm, setShowAnnotationForm] = useState(false);
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+
+  // Group tags by category
+  const tagsByCategory = React.useMemo(() => {
+    const grouped: { [key: string]: Tag[] } = {};
+    
+    tags.forEach(tag => {
+      if (!grouped[tag.category]) {
+        grouped[tag.category] = [];
+      }
+      grouped[tag.category].push(tag);
+    });
+    
+    return grouped;
+  }, [tags]);
 
   // Fetch existing annotations when in edit mode
   useEffect(() => {
@@ -397,23 +414,34 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
               </div>
             )}
             
-            {tags.length > 0 && (
+            {Object.keys(tagsByCategory).length > 0 && (
               <div className="space-y-2">
                 <Label>Tags</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {tags.map(tag => (
-                    <div key={tag.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`tag-${tag.id}`}
-                        checked={selectedTags.includes(tag.id)}
-                        onCheckedChange={() => handleTagToggle(tag.id)}
-                      />
-                      <Label htmlFor={`tag-${tag.id}`} className="cursor-pointer">
-                        {tag.name}
-                      </Label>
-                    </div>
+                <Accordion type="multiple" className="w-full space-y-2">
+                  {Object.entries(tagsByCategory).map(([category, categoryTags]) => (
+                    <AccordionItem key={category} value={category} className="border rounded-md">
+                      <AccordionTrigger className="px-4 py-2 hover:no-underline">
+                        {category}
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          {categoryTags.map(tag => (
+                            <div key={tag.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`tag-${tag.id}`}
+                                checked={selectedTags.includes(tag.id)}
+                                onCheckedChange={() => handleTagToggle(tag.id)}
+                              />
+                              <Label htmlFor={`tag-${tag.id}`} className="cursor-pointer">
+                                {tag.name}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
                   ))}
-                </div>
+                </Accordion>
               </div>
             )}
             
