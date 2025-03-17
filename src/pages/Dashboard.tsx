@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/s
 import DashboardSidebar from '@/components/DashboardSidebar';
 import Home from '@/pages/Home';
 import JournalEntries from '@/pages/JournalEntries';
+import CreateJournalEntry from '@/pages/CreateJournalEntry';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,7 @@ const Dashboard: React.FC = () => {
                 <Route path="/calendar" element={<div className="p-6">Calendar view coming soon</div>} />
                 <Route path="/narratives" element={<div className="p-6">Narratives view coming soon</div>} />
                 <Route path="/journal" element={<JournalEntries />} />
+                <Route path="/journal/create" element={<CreateJournalEntry />} />
               </Routes>
             </div>
           </div>
