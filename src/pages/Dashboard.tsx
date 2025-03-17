@@ -1,8 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Routes, Route } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
+import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import DashboardSidebar from '@/components/DashboardSidebar';
+import Home from '@/pages/Home';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -36,10 +38,6 @@ const Dashboard: React.FC = () => {
     };
   }, [navigate]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -49,19 +47,26 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">VenusHub Dashboard</h1>
-        <Button onClick={handleSignOut}>Sign Out</Button>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <DashboardSidebar userEmail={userEmail} />
+        <SidebarInset>
+          <div className="flex h-full flex-col">
+            <div className="flex items-center border-b px-4 py-2">
+              <SidebarTrigger className="mr-2" />
+              <h2 className="text-lg font-medium">Dashboard</h2>
+            </div>
+            <div className="flex-grow overflow-auto">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/calendar" element={<div className="p-6">Calendar view coming soon</div>} />
+                <Route path="/narratives" element={<div className="p-6">Narratives view coming soon</div>} />
+              </Routes>
+            </div>
+          </div>
+        </SidebarInset>
       </div>
-      
-      <div className="bg-card border rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Welcome, {userEmail}</h2>
-        <p className="text-muted-foreground">
-          This is your dashboard. More features coming soon!
-        </p>
-      </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
