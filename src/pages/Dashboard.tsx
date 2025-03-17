@@ -14,6 +14,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const navigate = useNavigate();
+  
   useEffect(() => {
     const getUser = async () => {
       const {
@@ -29,6 +30,7 @@ const Dashboard: React.FC = () => {
       setLoading(false);
     };
     getUser();
+    
     const {
       data: {
         subscription
@@ -38,21 +40,24 @@ const Dashboard: React.FC = () => {
         navigate('/');
       }
     });
+    
     return () => {
       subscription.unsubscribe();
     };
   }, [navigate]);
+  
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center">
         <p>Loading...</p>
       </div>;
   }
-  return <SidebarProvider>
+  
+  return (
+    <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <DashboardSidebar userEmail={userEmail} />
         <SidebarInset>
           <div className="flex h-full flex-col">
-            
             <div className="flex-grow overflow-auto">
               <Routes>
                 <Route path="/" element={<Home />} />
@@ -66,7 +71,8 @@ const Dashboard: React.FC = () => {
           </div>
         </SidebarInset>
       </div>
-    </SidebarProvider>;
+    </SidebarProvider>
+  );
 };
 
 export default Dashboard;
