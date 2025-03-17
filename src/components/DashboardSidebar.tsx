@@ -52,12 +52,23 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
           
           <SidebarMenuItem>
             <SidebarMenuButton 
-              isActive={window.location.pathname === '/dashboard/journal'}
+              isActive={window.location.pathname.includes('/dashboard/journal')}
               onClick={() => handleNavigation('/dashboard/journal')}
               tooltip="Journal"
             >
               <BookOpen />
               <span>Journal</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              isActive={window.location.pathname.includes('/dashboard/narratives')}
+              onClick={() => handleNavigation('/dashboard/narratives')}
+              tooltip="Narratives"
+            >
+              <BookText />
+              <span>Narratives</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           
@@ -69,17 +80,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
             >
               <Calendar />
               <span>Calendar</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              isActive={window.location.pathname === '/dashboard/narratives'}
-              onClick={() => handleNavigation('/dashboard/narratives')}
-              tooltip="Narratives"
-            >
-              <BookText />
-              <span>Narratives</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

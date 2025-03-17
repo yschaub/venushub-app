@@ -110,6 +110,71 @@ export type Database = {
           },
         ]
       }
+      narrative_categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          type: Database["public"]["Enums"]["narrative_category_type"]
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          type: Database["public"]["Enums"]["narrative_category_type"]
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          type?: Database["public"]["Enums"]["narrative_category_type"]
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      narratives: {
+        Row: {
+          category_id: string
+          content: string | null
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narratives_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "narrative_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -160,6 +225,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      narrative_category_type: "eclipse" | "return" | "transit" | "custom"
       tag_category:
         | "Planets"
         | "Event"

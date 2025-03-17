@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Routes, Route } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +8,7 @@ import Home from '@/pages/Home';
 import JournalEntries from '@/pages/JournalEntries';
 import CreateJournalEntry from '@/pages/CreateJournalEntry';
 import EditJournalEntry from '@/pages/EditJournalEntry';
+import Narratives from '@/pages/Narratives';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,7 @@ const Dashboard: React.FC = () => {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/calendar" element={<div className="p-6">Calendar view coming soon</div>} />
-                <Route path="/narratives" element={<div className="p-6">Narratives view coming soon</div>} />
+                <Route path="/narratives" element={<Narratives />} />
                 <Route path="/journal" element={<JournalEntries />} />
                 <Route path="/journal/create" element={<CreateJournalEntry />} />
                 <Route path="/journal/:id/edit" element={<EditJournalEntry />} />
