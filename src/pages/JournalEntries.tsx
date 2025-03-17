@@ -78,11 +78,14 @@ const JournalEntries: React.FC = () => {
         return;
       }
       
-      // Insert the entry
+      // Extract tags before inserting entry
+      const { tags: selectedTags, ...entryData } = newEntry;
+      
+      // Insert the entry without tags field
       const { data: entry, error: entryError } = await supabase
         .from('journal_entries')
         .insert({
-          ...newEntry,
+          ...entryData,
           user_id: user.id
         })
         .select()
@@ -91,8 +94,8 @@ const JournalEntries: React.FC = () => {
       if (entryError) throw entryError;
       
       // Add tags if any were selected
-      if (newEntry.tags && newEntry.tags.length > 0) {
-        const tagInserts = newEntry.tags.map((tagId: string) => ({
+      if (selectedTags && selectedTags.length > 0) {
+        const tagInserts = selectedTags.map((tagId: string) => ({
           journal_entry_id: entry.id,
           tag_id: tagId
         }));
@@ -105,7 +108,7 @@ const JournalEntries: React.FC = () => {
       }
       
       // Add the new entry to the state
-      setEntries([{ ...entry, tags: newEntry.tags || [] }, ...entries]);
+      setEntries([{ ...entry, tags: selectedTags || [] }, ...entries]);
       setIsCreating(false);
       
       toast({
