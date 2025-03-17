@@ -36,6 +36,50 @@ export type Database = {
         }
         Relationships: []
       }
+      journal_entry_annotations: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          journal_entry_id: string
+          selected_text: string
+          selection_end: number
+          selection_start: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          journal_entry_id: string
+          selected_text: string
+          selection_end: number
+          selection_start: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          journal_entry_id?: string
+          selected_text?: string
+          selection_end?: number
+          selection_start?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entry_annotations_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       journal_entry_tags: {
         Row: {
           journal_entry_id: string

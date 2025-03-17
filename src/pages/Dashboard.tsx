@@ -6,6 +6,7 @@ import DashboardSidebar from '@/components/DashboardSidebar';
 import Home from '@/pages/Home';
 import JournalEntries from '@/pages/JournalEntries';
 import CreateJournalEntry from '@/pages/CreateJournalEntry';
+import EditJournalEntry from '@/pages/EditJournalEntry';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -57,6 +58,7 @@ const Dashboard: React.FC = () => {
                 <Route path="/narratives" element={<div className="p-6">Narratives view coming soon</div>} />
                 <Route path="/journal" element={<JournalEntries />} />
                 <Route path="/journal/create" element={<CreateJournalEntry />} />
+                <Route path="/journal/:id/edit" element={<EditJournalEntry />} />
               </Routes>
             </div>
           </div>

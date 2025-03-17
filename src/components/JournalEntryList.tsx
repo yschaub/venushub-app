@@ -4,7 +4,8 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Edit } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Tag {
   id: string;
@@ -32,6 +33,8 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
   onDelete,
   tags
 }) => {
+  const navigate = useNavigate();
+
   if (isLoading) {
     return <div className="py-20 text-center">Loading journal entries...</div>;
   }
@@ -58,14 +61,24 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <CardTitle className="text-xl">{entry.title}</CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onDelete(entry.id)}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center space-x-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate(`/dashboard/journal/${entry.id}/edit`)}
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  <Edit className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onDelete(entry.id)}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
             <div className="text-sm text-muted-foreground">
               {format(new Date(entry.date_created), 'MMMM d, yyyy')}
