@@ -142,12 +142,6 @@ const Narratives: React.FC = () => {
                     <ChevronRight className="h-4 w-4 ml-auto" />
                   }
                 </div>
-                <CardDescription>
-                  {category.type === 'eclipse' && 'Track and interpret eclipse events'}
-                  {category.type === 'return' && 'Document planet returns in your chart'}
-                  {category.type === 'transit' && 'Record significant planetary transits'}
-                  {category.type === 'custom' && 'Your custom narrative category'}
-                </CardDescription>
               </CardHeader>
               {expandedCategories[category.id] && (
                 <CardContent>
