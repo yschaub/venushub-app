@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import Home from '@/pages/Home';
+import JournalEntries from '@/pages/JournalEntries';
+
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -52,6 +54,7 @@ const Dashboard: React.FC = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/calendar" element={<div className="p-6">Calendar view coming soon</div>} />
                 <Route path="/narratives" element={<div className="p-6">Narratives view coming soon</div>} />
+                <Route path="/journal" element={<JournalEntries />} />
               </Routes>
             </div>
           </div>
@@ -59,4 +62,5 @@ const Dashboard: React.FC = () => {
       </div>
     </SidebarProvider>;
 };
+
 export default Dashboard;

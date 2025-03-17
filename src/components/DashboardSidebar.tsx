@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Calendar, BookText, LogOut } from 'lucide-react';
+import { Home, Calendar, BookText, LogOut, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Sidebar, 
@@ -14,7 +14,6 @@ import {
   SidebarSeparator
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface DashboardSidebarProps {
   userEmail: string | null;
@@ -42,7 +41,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 
-              isActive={true}
+              isActive={window.location.pathname === '/dashboard'}
               onClick={() => handleNavigation('/dashboard')}
               tooltip="Home"
             >
@@ -53,6 +52,18 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
           
           <SidebarMenuItem>
             <SidebarMenuButton 
+              isActive={window.location.pathname === '/dashboard/journal'}
+              onClick={() => handleNavigation('/dashboard/journal')}
+              tooltip="Journal"
+            >
+              <BookOpen />
+              <span>Journal</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              isActive={window.location.pathname === '/dashboard/calendar'}
               onClick={() => handleNavigation('/dashboard/calendar')}
               tooltip="Calendar"
             >
@@ -63,6 +74,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
           
           <SidebarMenuItem>
             <SidebarMenuButton 
+              isActive={window.location.pathname === '/dashboard/narratives'}
               onClick={() => handleNavigation('/dashboard/narratives')}
               tooltip="Narratives"
             >
