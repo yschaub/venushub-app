@@ -87,6 +87,17 @@ const AnnotationSidebar: React.FC<AnnotationSidebarProps> = ({
                 annotation.selection_end
               );
               
+              // Handle case where context might be an empty string
+              const contextDisplay = typeof context === 'string' ? (
+                <span className="text-muted-foreground">{annotation.selected_text}</span>
+              ) : (
+                <>
+                  <span className="text-muted-foreground">{context.beforeText}</span>
+                  <span className="bg-yellow-100 dark:bg-yellow-900/30">{context.selectedText}</span>
+                  <span className="text-muted-foreground">{context.afterText}</span>
+                </>
+              );
+              
               return (
                 <div
                   key={annotation.id}
@@ -96,9 +107,7 @@ const AnnotationSidebar: React.FC<AnnotationSidebarProps> = ({
                     className="text-sm mb-2 cursor-pointer"
                     onClick={() => scrollToAnnotation(annotation)}
                   >
-                    <span className="text-muted-foreground">{context.beforeText}</span>
-                    <span className="bg-yellow-100 dark:bg-yellow-900/30">{context.selectedText}</span>
-                    <span className="text-muted-foreground">{context.afterText}</span>
+                    {contextDisplay}
                   </div>
                   
                   <p className="text-sm font-medium mb-2">{annotation.content}</p>
