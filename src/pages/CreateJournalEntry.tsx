@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
-import JournalEntryForm from '@/components/JournalEntryForm';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import JournalEntryEditor from '@/components/JournalEntryEditor';
 
 const CreateJournalEntry: React.FC = () => {
   const [tags, setTags] = useState<any[]>([]);
@@ -38,65 +38,6 @@ const CreateJournalEntry: React.FC = () => {
     fetchTags();
   }, [toast]);
 
-  const handleCreateEntry = async (newEntry: any) => {
-    try {
-      // Get the current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Authentication Error",
-          description: "You must be logged in to create entries",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Extract tags before inserting entry
-      const { tags: selectedTags, ...entryData } = newEntry;
-      
-      // Insert the entry without tags field
-      const { data: entry, error: entryError } = await supabase
-        .from('journal_entries')
-        .insert({
-          ...entryData,
-          user_id: user.id
-        })
-        .select()
-        .single();
-        
-      if (entryError) throw entryError;
-      
-      // Add tags if any were selected
-      if (selectedTags && selectedTags.length > 0) {
-        const tagInserts = selectedTags.map((tagId: string) => ({
-          journal_entry_id: entry.id,
-          tag_id: tagId
-        }));
-        
-        const { error: tagError } = await supabase
-          .from('journal_entry_tags')
-          .insert(tagInserts);
-          
-        if (tagError) throw tagError;
-      }
-      
-      toast({
-        title: "Success",
-        description: "Journal entry created successfully"
-      });
-
-      // Navigate back to the journal entries list
-      navigate('/dashboard/journal');
-    } catch (error) {
-      console.error('Error creating journal entry:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create journal entry",
-        variant: "destructive"
-      });
-    }
-  };
-
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading tags...</div>;
   }
@@ -119,13 +60,12 @@ const CreateJournalEntry: React.FC = () => {
         <p className="text-muted-foreground mt-1">Record your thoughts, feelings, and experiences</p>
       </div>
       
-      <div className="bg-card p-6 rounded-lg border">
-        <JournalEntryForm 
-          onSubmit={handleCreateEntry} 
-          onCancel={() => navigate('/dashboard/journal')}
-          tags={tags}
-        />
-      </div>
+      <JournalEntryEditor
+        mode="create"
+        tags={tags}
+        onSuccess={() => navigate('/dashboard/journal')}
+        onCancel={() => navigate('/dashboard/journal')}
+      />
     </div>
   );
 };
