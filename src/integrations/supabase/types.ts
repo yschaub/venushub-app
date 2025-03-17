@@ -137,6 +137,39 @@ export type Database = {
         }
         Relationships: []
       }
+      narrative_journal_entries: {
+        Row: {
+          added_at: string
+          journal_entry_id: string
+          narrative_id: string
+        }
+        Insert: {
+          added_at?: string
+          journal_entry_id: string
+          narrative_id: string
+        }
+        Update: {
+          added_at?: string
+          journal_entry_id?: string
+          narrative_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narrative_journal_entries_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "narrative_journal_entries_narrative_id_fkey"
+            columns: ["narrative_id"]
+            isOneToOne: false
+            referencedRelation: "narratives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       narratives: {
         Row: {
           category_id: string

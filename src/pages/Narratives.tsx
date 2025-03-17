@@ -1,16 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Folder } from 'lucide-react';
+import { PlusCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import NarrativesList from '@/components/NarrativesList';
 
 const Narratives: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -73,6 +74,13 @@ const Narratives: React.FC = () => {
     }
   };
 
+  const toggleCategoryExpand = (categoryId: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading categories...</div>;
   }
@@ -110,16 +118,6 @@ const Narratives: React.FC = () => {
             Organize your astrological stories and insights
           </p>
         </div>
-        <Button 
-          onClick={() => toast({
-            title: "Coming Soon",
-            description: "Creating new narratives will be available soon!"
-          })} 
-          className="flex items-center gap-2"
-        >
-          <PlusCircle className="h-4 w-4" />
-          New Narrative
-        </Button>
       </div>
 
       {categories.length === 0 ? (
@@ -129,20 +127,20 @@ const Narratives: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-4">
           {categories.map((category) => (
             <Card 
               key={category.id} 
-              className="cursor-pointer hover:bg-muted/20 transition-colors"
-              onClick={() => toast({
-                title: "Coming Soon",
-                description: `The ${category.name} category will be available soon!`
-              })}
+              className="overflow-hidden"
             >
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 cursor-pointer" onClick={() => toggleCategoryExpand(category.id)}>
                 <div className="flex items-center gap-2">
                   <div className="text-2xl">{getCategoryIcon(category.type)}</div>
                   <CardTitle>{category.name}</CardTitle>
+                  {expandedCategories[category.id] ? 
+                    <ChevronDown className="h-4 w-4 ml-auto" /> : 
+                    <ChevronRight className="h-4 w-4 ml-auto" />
+                  }
                 </div>
                 <CardDescription>
                   {category.type === 'eclipse' && 'Track and interpret eclipse events'}
@@ -151,12 +149,14 @@ const Narratives: React.FC = () => {
                   {category.type === 'custom' && 'Your custom narrative category'}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center text-muted-foreground text-sm">
-                  <Folder className="h-4 w-4 mr-1" />
-                  <span>0 narratives</span>
-                </div>
-              </CardContent>
+              {expandedCategories[category.id] && (
+                <CardContent>
+                  <NarrativesList 
+                    categoryId={category.id} 
+                    categoryName={category.name} 
+                  />
+                </CardContent>
+              )}
             </Card>
           ))}
         </div>
