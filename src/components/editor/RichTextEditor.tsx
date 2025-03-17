@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import Document from '@tiptap/extension-document';
@@ -116,7 +115,6 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>((props
       for (const {from, to} of annotations.reverse()) { // Process in reverse to maintain position integrity
         editor.chain()
           .focus()
-          .removeTextStyle({from, to})
           .unsetMark('annotation', {from, to})
           .run();
       }
