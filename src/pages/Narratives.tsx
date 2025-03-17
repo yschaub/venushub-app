@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 const Narratives: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -17,17 +18,33 @@ const Narratives: React.FC = () => {
     const fetchCategories = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+        
+        // First get the current user ID
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) throw userError;
+        
+        if (!user) {
+          setError("No authenticated user found");
+          return;
+        }
+        
+        // Then fetch categories for this user only
         const { data: categoriesData, error: categoriesError } = await supabase
           .from('narrative_categories')
           .select('*')
           .eq('is_active', true)
+          .eq('user_id', user.id)
           .order('name');
 
         if (categoriesError) throw categoriesError;
         
+        console.log("Fetched user categories:", categoriesData);
         setCategories(categoriesData);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching narrative categories:', error);
+        setError(error.message || "Failed to load categories");
         toast({
           title: "Error",
           description: "Failed to load narrative categories",
@@ -58,6 +75,30 @@ const Narratives: React.FC = () => {
 
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading categories...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold">Narratives</h2>
+          <p className="text-muted-foreground mt-1">
+            Organize your astrological stories and insights
+          </p>
+        </div>
+        <Card className="bg-muted/50">
+          <CardContent className="py-10 text-center">
+            <p className="text-destructive mb-2">Error: {error}</p>
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
