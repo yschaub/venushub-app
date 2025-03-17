@@ -43,8 +43,8 @@ export type Database = {
           id: string
           journal_entry_id: string
           selected_text: string
-          selection_end: number
-          selection_start: number
+          selection_end: number | null
+          selection_start: number | null
           updated_at: string
           user_id: string
         }
@@ -54,8 +54,8 @@ export type Database = {
           id?: string
           journal_entry_id: string
           selected_text: string
-          selection_end: number
-          selection_start: number
+          selection_end?: number | null
+          selection_start?: number | null
           updated_at?: string
           user_id: string
         }
@@ -65,8 +65,8 @@ export type Database = {
           id?: string
           journal_entry_id?: string
           selected_text?: string
-          selection_end?: number
-          selection_start?: number
+          selection_end?: number | null
+          selection_start?: number | null
           updated_at?: string
           user_id?: string
         }

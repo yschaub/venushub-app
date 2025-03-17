@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,6 +25,8 @@ interface Annotation {
   selected_text: string;
   created_at: string;
   journal_entry_id?: string;
+  selection_start?: number;
+  selection_end?: number;
 }
 
 interface JournalEntryEditorProps {
@@ -64,7 +65,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   const editorRef = useRef<RichTextEditorRef>(null);
   const { toast } = useToast();
 
-  // Group tags by category
   const tagsByCategory = React.useMemo(() => {
     const grouped: { [key: string]: Tag[] } = {};
     
@@ -78,7 +78,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     return grouped;
   }, [tags]);
 
-  // Convert ProseMirror annotations to our format when in edit mode
   const convertAnnotations = (editorAnnotations: AnnotationMark[]): Annotation[] => {
     return editorAnnotations.map(annotation => ({
       id: annotation.id,
@@ -89,7 +88,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     }));
   };
 
-  // Fetch existing annotations when in edit mode
   useEffect(() => {
     if (mode === 'edit' && entryId) {
       const fetchAnnotations = async () => {
@@ -102,13 +100,14 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             
           if (error) throw error;
           
-          // Transform data format to match our new annotations structure
           const transformedData = data?.map(item => ({
             id: item.id,
             content: item.content,
             selected_text: item.selected_text,
             created_at: item.created_at,
-            journal_entry_id: item.journal_entry_id
+            journal_entry_id: item.journal_entry_id,
+            selection_start: item.selection_start,
+            selection_end: item.selection_end
           })) || [];
           
           setAnnotations(transformedData);
@@ -135,10 +134,8 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     if (!selectedText || !annotationContent.trim() || !editorRef.current) return;
     
     try {
-      // Add annotation to the editor
       editorRef.current.addAnnotation(annotationContent);
       
-      // Get all annotations from the editor to update state
       const editorAnnotations = editorRef.current.getAnnotations();
       const newAnnotations = convertAnnotations(editorAnnotations);
       
@@ -163,7 +160,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
 
   const handleDeleteAnnotation = async (annotationId: string) => {
     try {
-      // If in edit mode, delete from database
       if (mode === 'edit' && entryId) {
         const { error } = await supabase
           .from('journal_entry_annotations')
@@ -173,13 +169,10 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
         if (error) throw error;
       }
       
-      // Remove from state
       setAnnotations(annotations.filter(a => a.id !== annotationId));
       
-      // Need to re-apply annotations to editor
       if (editorRef.current) {
-        // This would be a more complex operation that refreshes the editor
-        // with the updated annotations. For now, we'll just update the state.
+        editorRef.current.scrollToAnnotation(annotationId);
       }
       
       toast({
@@ -209,7 +202,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     setIsLoading(true);
     
     try {
-      // Get the current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({
@@ -220,12 +212,10 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
         return;
       }
       
-      // Get the latest editor state and annotations
       const editorHtml = editorRef.current?.getHTML() || content;
       const editorAnnotations = editorRef.current?.getAnnotations() || [];
       
       if (mode === 'create') {
-        // Create a new journal entry
         const { data: entry, error: entryError } = await supabase
           .from('journal_entries')
           .insert({
@@ -238,7 +228,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           
         if (entryError) throw entryError;
         
-        // Add tags if any were selected
         if (selectedTags.length > 0) {
           const tagInserts = selectedTags.map((tagId: string) => ({
             journal_entry_id: entry.id,
@@ -252,7 +241,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           if (tagError) throw tagError;
         }
         
-        // Save annotations
         if (editorAnnotations.length > 0) {
           const annotationInserts = editorAnnotations.map((annotation) => ({
             id: annotation.id,
@@ -274,7 +262,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           description: "Journal entry created successfully"
         });
       } else if (mode === 'edit' && entryId) {
-        // Update the existing journal entry
         const { error: entryError } = await supabase
           .from('journal_entries')
           .update({
@@ -286,7 +273,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           
         if (entryError) throw entryError;
         
-        // Delete existing tag associations
         const { error: deleteTagsError } = await supabase
           .from('journal_entry_tags')
           .delete()
@@ -294,7 +280,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           
         if (deleteTagsError) throw deleteTagsError;
         
-        // Add new tag associations
         if (selectedTags.length > 0) {
           const tagInserts = selectedTags.map(tagId => ({
             journal_entry_id: entryId,
@@ -308,8 +293,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           if (insertTagsError) throw insertTagsError;
         }
         
-        // Handle annotations - this is more complex now
-        // First, get all current annotations from the database
         const { data: existingAnnotations, error: fetchAnnotationsError } = await supabase
           .from('journal_entry_annotations')
           .select('id')
@@ -317,11 +300,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           
         if (fetchAnnotationsError) throw fetchAnnotationsError;
         
-        // Determine which annotations to create, update, or delete
         const existingIds = new Set(existingAnnotations?.map(a => a.id) || []);
         const currentIds = new Set(editorAnnotations.map(a => a.id));
         
-        // Annotations to create (in current but not in existing)
         const annotationsToCreate = editorAnnotations.filter(a => !existingIds.has(a.id));
         
         if (annotationsToCreate.length > 0) {
@@ -340,7 +321,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           if (createAnnotationsError) throw createAnnotationsError;
         }
         
-        // Annotations to delete (in existing but not in current)
         const annotationsToDelete = Array.from(existingIds).filter(id => !currentIds.has(id));
         
         if (annotationsToDelete.length > 0) {
@@ -371,7 +351,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     }
   };
 
-  // Scroll to an annotation
   const handleAnnotationClick = (annotationId: string) => {
     if (editorRef.current) {
       editorRef.current.scrollToAnnotation(annotationId);
