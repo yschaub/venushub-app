@@ -9,6 +9,7 @@ import JournalEntries from '@/pages/JournalEntries';
 import CreateJournalEntry from '@/pages/CreateJournalEntry';
 import EditJournalEntry from '@/pages/EditJournalEntry';
 import Narratives from '@/pages/Narratives';
+import CalendarView from '@/pages/CalendarView';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -61,7 +62,7 @@ const Dashboard: React.FC = () => {
             <div className="flex-grow overflow-auto">
               <Routes>
                 <Route path="/" element={<Home />} />
-                <Route path="/calendar" element={<div className="p-6">Calendar view coming soon</div>} />
+                <Route path="/calendar" element={<CalendarView />} />
                 <Route path="/narratives" element={<Narratives />} />
                 <Route path="/journal" element={<JournalEntries />} />
                 <Route path="/journal/create" element={<CreateJournalEntry />} />

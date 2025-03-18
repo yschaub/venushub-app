@@ -9,6 +9,69 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      event_relationships: {
+        Row: {
+          created_at: string
+          event_id: string
+          related_event_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          related_event_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          related_event_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_relationships_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_relationships_related_event_id_fkey"
+            columns: ["related_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          date: string
+          end_date: string
+          id: string
+          primary_event: boolean
+          start_date: string
+          tags: string[] | null
+          title: string
+        }
+        Insert: {
+          date: string
+          end_date: string
+          id?: string
+          primary_event?: boolean
+          start_date: string
+          tags?: string[] | null
+          title: string
+        }
+        Update: {
+          date?: string
+          end_date?: string
+          id?: string
+          primary_event?: boolean
+          start_date?: string
+          tags?: string[] | null
+          title?: string
+        }
+        Relationships: []
+      }
       journal_entries: {
         Row: {
           content: string | null
