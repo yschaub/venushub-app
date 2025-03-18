@@ -38,6 +38,29 @@ const CreateJournalEntry: React.FC = () => {
           
         if (tagsError) throw tagsError;
         setTags(tagsData);
+        
+        // If coming from an event, check if a journal entry already exists for this event
+        if (eventData?.id) {
+          const { data, error } = await supabase
+            .from('journal_entries')
+            .select('id')
+            .eq('event_id', eventData.id)
+            .single();
+          
+          if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+            console.error('Error checking existing entry:', error);
+          }
+          
+          if (data) {
+            // An entry already exists, navigate to edit
+            toast({
+              title: "Journal Entry Exists",
+              description: "A journal entry for this event already exists. Redirecting to edit.",
+            });
+            navigate(`/dashboard/journal/edit/${data.id}`);
+            return;
+          }
+        }
       } catch (error) {
         console.error('Error fetching tags:', error);
         toast({
@@ -51,7 +74,7 @@ const CreateJournalEntry: React.FC = () => {
     };
 
     fetchTags();
-  }, [toast]);
+  }, [toast, navigate, eventData]);
 
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading tags...</div>;

@@ -19,10 +19,15 @@ interface Event {
   tags: string[] | null;
 }
 
+interface TagMapping {
+  [key: string]: string;
+}
+
 const Home: React.FC = () => {
   const [todayEvents, setTodayEvents] = useState<Event[]>([]);
   const [currentEvents, setCurrentEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [tagMapping, setTagMapping] = useState<TagMapping>({});
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -33,6 +38,22 @@ const Home: React.FC = () => {
         
         const today = new Date();
         const formattedToday = format(today, 'yyyy-MM-dd');
+        
+        // Fetch all available tags for mapping
+        const { data: tagsData, error: tagsError } = await supabase
+          .from('system_tags')
+          .select('*')
+          .order('name');
+          
+        if (tagsError) throw tagsError;
+        
+        // Create mapping of tag names to IDs
+        const mapping: TagMapping = {};
+        tagsData?.forEach(tag => {
+          mapping[tag.name] = tag.id;
+        });
+        
+        setTagMapping(mapping);
         
         // Fetch events happening today (exact date match)
         const { data: todayData, error: todayError } = await supabase
@@ -78,20 +99,63 @@ const Home: React.FC = () => {
   const handleJournalAboutEvent = (event: Event, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent event card click from triggering
     
-    // Log the event and its tags to verify what's being passed
-    console.log("Journaling about event:", event);
-    console.log("Event tags:", event.tags);
-    
-    navigate('/dashboard/journal/create', { 
-      state: { 
-        eventData: {
-          id: event.id,
-          title: event.title,
-          tags: event.tags || [],
-          date: event.date
-        } 
+    // First check if a journal entry already exists for this event
+    const checkExistingEntry = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('journal_entries')
+          .select('id')
+          .eq('event_id', event.id)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+          throw error;
+        }
+        
+        if (data) {
+          // Entry already exists, navigate to edit
+          toast({
+            title: "Journal Entry Exists",
+            description: "A journal entry for this event already exists. Redirecting to edit.",
+          });
+          navigate(`/dashboard/journal/edit/${data.id}`);
+          return;
+        }
+        
+        // Convert tag names to tag IDs
+        const tagIds = event.tags?.map(tagName => {
+          const id = tagMapping[tagName];
+          if (!id) {
+            console.warn(`No ID found for tag: ${tagName}`);
+          }
+          return id;
+        }).filter(Boolean) || [];
+        
+        console.log("Journaling about event:", event);
+        console.log("Event tags mapped to IDs:", tagIds);
+        
+        // Navigate to create with event data
+        navigate('/dashboard/journal/create', { 
+          state: { 
+            eventData: {
+              id: event.id,
+              title: event.title,
+              tags: tagIds,
+              date: event.date
+            } 
+          }
+        });
+      } catch (error) {
+        console.error('Error checking for existing journal entry:', error);
+        toast({
+          title: "Error",
+          description: "There was an error checking for existing journal entries.",
+          variant: "destructive"
+        });
       }
-    });
+    };
+    
+    checkExistingEntry();
   };
   
   const renderEventCard = (event: Event) => (
