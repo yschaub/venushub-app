@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -279,6 +278,13 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
       const formattedDate = entryDate ? format(entryDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
 
       if (mode === 'create') {
+        console.log('Creating journal entry with:', {
+          title,
+          user_id: user.id,
+          event_id: eventId || null,
+          date: formattedDate
+        });
+
         const { data: entry, error: entryError } = await supabase
           .from('journal_entries')
           .insert({
@@ -293,7 +299,21 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
 
         if (entryError) {
           console.error('Error creating journal entry:', entryError);
-          throw entryError;
+          
+          if (entryError.message && entryError.message.includes('A journal entry for this event already exists for this user')) {
+            toast({
+              title: "Error",
+              description: "You already have a journal entry for this event",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Error",
+              description: "Failed to create journal entry: " + entryError.message,
+              variant: "destructive"
+            });
+          }
+          return;
         }
 
         if (selectedTags.length > 0) {
@@ -306,7 +326,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             .from('journal_entry_tags')
             .insert(tagInserts);
 
-          if (tagError) throw tagError;
+          if (tagError) {
+            console.error('Error adding tags:', tagError);
+          }
         }
 
         if (editorAnnotations.length > 0) {
@@ -322,7 +344,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             .from('journal_entry_annotations')
             .insert(annotationInserts);
 
-          if (annotationError) throw annotationError;
+          if (annotationError) {
+            console.error('Error adding annotations:', annotationError);
+          }
         }
 
         toast({
@@ -414,7 +438,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
       console.error('Error saving journal entry:', error);
       toast({
         title: "Error",
-        description: "Failed to save journal entry",
+        description: "Failed to save journal entry: " + (error instanceof Error ? error.message : String(error)),
         variant: "destructive"
       });
     } finally {
