@@ -291,7 +291,10 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           .select()
           .single();
 
-        if (entryError) throw entryError;
+        if (entryError) {
+          console.error('Error creating journal entry:', entryError);
+          throw entryError;
+        }
 
         if (selectedTags.length > 0) {
           const tagInserts = selectedTags.map((tagId: string) => ({
@@ -389,7 +392,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           if (createAnnotationsError) throw createAnnotationsError;
         }
 
-        const annotationsToDelete = Array.from(existingIds).filter(id => !currentIds.has(id));
+        const annotationsToDelete = Array.from(existingIds).filter(id => !currentIds.has(id as string));
 
         if (annotationsToDelete.length > 0) {
           const { error: deleteAnnotationsError } = await supabase
