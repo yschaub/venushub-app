@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -75,6 +76,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   );
   const editorRef = useRef<RichTextEditorRef>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   console.log("Initial tags from event:", initialValues.tags);
   console.log("Selected tags state:", selectedTags);
@@ -126,7 +128,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     }
   }, [mode, entryId]);
 
-  const tagsByCategory = React.useMemo(() => {
+  const tagsByCategory = useMemo(() => {
     const grouped: { [key: string]: Tag[] } = {};
 
     tags.forEach(tag => {
@@ -278,13 +280,32 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
       const formattedDate = entryDate ? format(entryDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
 
       if (mode === 'create') {
-        console.log('Creating journal entry with:', {
-          title,
-          user_id: user.id,
-          event_id: eventId || null,
-          date: formattedDate
-        });
+        // First check if an entry already exists for this event
+        if (eventId) {
+          const { data: existingEntry, error: checkError } = await supabase
+            .from('journal_entries')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('event_id', eventId)
+            .maybeSingle();
+            
+          if (checkError) {
+            console.error('Error checking existing entry:', checkError);
+          } else if (existingEntry) {
+            // A journal entry already exists for this event, redirect to edit it
+            toast({
+              title: "Information",
+              description: "You already have a journal entry for this event. Redirecting to edit it.",
+              duration: 5000,
+            });
+            
+            setIsLoading(false);
+            navigate(`/dashboard/journal/${existingEntry.id}/edit`);
+            return;
+          }
+        }
 
+        // No existing entry, create a new one
         const { data: entry, error: entryError } = await supabase
           .from('journal_entries')
           .insert({
@@ -300,19 +321,12 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
         if (entryError) {
           console.error('Error creating journal entry:', entryError);
           
-          if (entryError.message && entryError.message.includes('A journal entry for this event already exists for this user')) {
-            toast({
-              title: "Error",
-              description: "You already have a journal entry for this event",
-              variant: "destructive"
-            });
-          } else {
-            toast({
-              title: "Error",
-              description: "Failed to create journal entry: " + entryError.message,
-              variant: "destructive"
-            });
-          }
+          toast({
+            title: "Error",
+            description: "Failed to create journal entry: " + entryError.message,
+            variant: "destructive"
+          });
+          setIsLoading(false);
           return;
         }
 
