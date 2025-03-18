@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -45,6 +44,14 @@ const CalendarView = () => {
     const fetchDataForMonth = async () => {
       setLoading(true);
       
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found');
+        setLoading(false);
+        return;
+      }
+      
       const startDate = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const endDate = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
       
@@ -65,10 +72,11 @@ const CalendarView = () => {
         })));
       }
 
-      // Fetch journal entries
+      // Fetch journal entries for the current user only
       const { data: journalData, error: journalError } = await supabase
         .from('journal_entries')
         .select('*')
+        .eq('user_id', user.id)
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: true });

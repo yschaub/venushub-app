@@ -18,9 +18,21 @@ const JournalEntries: React.FC = () => {
     const fetchEntries = async () => {
       try {
         setIsLoading(true);
+        
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) throw userError;
+        
+        if (!user) {
+          throw new Error("No authenticated user found");
+        }
+        
+        // Fetch entries for current user only
         const { data: entriesData, error: entriesError } = await supabase
           .from('journal_entries')
           .select('*')
+          .eq('user_id', user.id)
           .order('date_created', { ascending: false });
 
         if (entriesError) throw entriesError;
