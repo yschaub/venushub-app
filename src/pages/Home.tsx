@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +37,6 @@ const Home: React.FC = () => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    // Get the current user ID
     const fetchUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user?.id || null);
@@ -49,7 +47,6 @@ const Home: React.FC = () => {
   
   useEffect(() => {
     const fetchEvents = async () => {
-      // Don't fetch events if there's no user logged in
       if (!currentUser) return;
       
       try {
@@ -58,7 +55,6 @@ const Home: React.FC = () => {
         const today = new Date();
         const formattedToday = format(today, 'yyyy-MM-dd');
         
-        // Fetch all available tags for mapping
         const { data: tagsData, error: tagsError } = await supabase
           .from('system_tags')
           .select('*')
@@ -66,7 +62,6 @@ const Home: React.FC = () => {
           
         if (tagsError) throw tagsError;
         
-        // Create mapping of tag names to IDs
         const mapping: TagMapping = {};
         tagsData?.forEach(tag => {
           mapping[tag.name] = tag.id;
@@ -74,7 +69,6 @@ const Home: React.FC = () => {
         
         setTagMapping(mapping);
         
-        // Fetch events happening today (exact date match)
         const { data: todayData, error: todayError } = await supabase
           .from('events')
           .select('*')
@@ -82,25 +76,22 @@ const Home: React.FC = () => {
           
         if (todayError) throw todayError;
         
-        // Fetch events that are currently unfolding (today falls within start_date and end_date)
         const { data: currentData, error: currentError } = await supabase
           .from('events')
           .select('*')
           .lte('start_date', formattedToday)
           .gte('end_date', formattedToday)
-          .not('date', 'eq', formattedToday); // Exclude today's events to avoid duplication
+          .not('date', 'eq', formattedToday);
           
         if (currentError) throw currentError;
         
-        // Check if each event has a journal entry for the current user
         const checkJournalEntries = async (events: Event[]): Promise<EventWithJournalStatus[]> => {
           const enhancedEvents = await Promise.all(events.map(async (event) => {
-            // Check if this event has a journal entry for the current user
             const { data, error } = await supabase
               .from('journal_entries')
               .select('id')
               .eq('event_id', event.id)
-              .eq('user_id', currentUser) // Check only for the current user's entries
+              .eq('user_id', currentUser)
               .maybeSingle();
             
             if (error) {
@@ -118,7 +109,6 @@ const Home: React.FC = () => {
           return enhancedEvents;
         };
         
-        // Enhance events with journal status information
         const enhancedTodayEvents = await checkJournalEntries(todayData || []);
         const enhancedCurrentEvents = await checkJournalEntries(currentData || []);
         
@@ -140,19 +130,21 @@ const Home: React.FC = () => {
   }, [toast, currentUser]);
   
   const handleEventClick = (event: EventWithJournalStatus) => {
-    // Navigate to calendar view with this date selected
     const date = new Date(event.date);
     navigate(`/dashboard/calendar?date=${format(date, 'yyyy-MM-dd')}`);
   };
   
   const handleJournalAction = (event: EventWithJournalStatus, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent event card click from triggering
+    e.stopPropagation();
+    
+    if (!currentUser) {
+      navigate('/auth');
+      return;
+    }
     
     if (event.hasJournal && event.journalId) {
-      // If a journal entry exists, navigate to view/edit it
       navigate(`/dashboard/journal/edit/${event.journalId}`);
     } else {
-      // Convert tag names to tag IDs
       const tagIds = event.tags?.map(tagName => {
         const id = tagMapping[tagName];
         if (!id) {
@@ -161,7 +153,6 @@ const Home: React.FC = () => {
         return id;
       }).filter(Boolean) || [];
       
-      // Navigate to create with event data
       navigate('/dashboard/journal/create', { 
         state: { 
           eventData: {
@@ -242,7 +233,6 @@ const Home: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Today's Events */}
           <Card>
             <CardHeader>
               <CardTitle className="text-xl flex items-center gap-2">
@@ -266,7 +256,6 @@ const Home: React.FC = () => {
             </CardContent>
           </Card>
           
-          {/* Currently Unfolding Events */}
           <Card>
             <CardHeader>
               <CardTitle className="text-xl flex items-center gap-2">

@@ -23,14 +23,40 @@ const EditJournalEntry: React.FC = () => {
       try {
         setIsLoading(true);
         
+        // First get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast({
+            title: "Authentication Error",
+            description: "You must be logged in to view journal entries",
+            variant: "destructive"
+          });
+          navigate('/auth');
+          return;
+        }
+        
         // Fetch journal entry
         const { data: entryData, error: entryError } = await supabase
           .from('journal_entries')
           .select('*')
           .eq('id', id)
-          .single();
+          .eq('user_id', user.id) // Only fetch if it belongs to the current user
+          .maybeSingle(); // Use maybeSingle instead of single to prevent errors if no entry is found
           
-        if (entryError) throw entryError;
+        if (entryError) {
+          console.error('Error fetching entry:', entryError);
+          throw entryError;
+        }
+        
+        if (!entryData) {
+          toast({
+            title: "Entry Not Found",
+            description: "The journal entry you're looking for doesn't exist or you don't have permission to view it",
+            variant: "destructive"
+          });
+          navigate('/dashboard/journal');
+          return;
+        }
         
         // Fetch tags for this entry
         const { data: entryTags, error: entryTagsError } = await supabase
@@ -58,13 +84,14 @@ const EditJournalEntry: React.FC = () => {
           description: "Failed to load journal entry",
           variant: "destructive"
         });
+        navigate('/dashboard/journal'); // Redirect on error
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchEntryData();
-  }, [id, toast]);
+  }, [id, toast, navigate]);
 
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading entry...</div>;
