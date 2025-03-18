@@ -33,11 +33,25 @@ const Home: React.FC = () => {
   const [currentEvents, setCurrentEvents] = useState<EventWithJournalStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tagMapping, setTagMapping] = useState<TagMapping>({});
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   
   useEffect(() => {
+    // Get the current user ID
+    const fetchUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user?.id || null);
+    };
+    
+    fetchUserData();
+  }, []);
+  
+  useEffect(() => {
     const fetchEvents = async () => {
+      // Don't fetch events if there's no user logged in
+      if (!currentUser) return;
+      
       try {
         setIsLoading(true);
         
@@ -78,14 +92,15 @@ const Home: React.FC = () => {
           
         if (currentError) throw currentError;
         
-        // Check if each event has a journal entry
+        // Check if each event has a journal entry for the current user
         const checkJournalEntries = async (events: Event[]): Promise<EventWithJournalStatus[]> => {
           const enhancedEvents = await Promise.all(events.map(async (event) => {
-            // Check if this event has a journal entry
+            // Check if this event has a journal entry for the current user
             const { data, error } = await supabase
               .from('journal_entries')
               .select('id')
               .eq('event_id', event.id)
+              .eq('user_id', currentUser) // Check only for the current user's entries
               .maybeSingle();
             
             if (error) {
@@ -122,7 +137,7 @@ const Home: React.FC = () => {
     };
     
     fetchEvents();
-  }, [toast]);
+  }, [toast, currentUser]);
   
   const handleEventClick = (event: EventWithJournalStatus) => {
     // Navigate to calendar view with this date selected
@@ -145,9 +160,6 @@ const Home: React.FC = () => {
         }
         return id;
       }).filter(Boolean) || [];
-      
-      console.log("Journaling about event:", event);
-      console.log("Event tags mapped to IDs:", tagIds);
       
       // Navigate to create with event data
       navigate('/dashboard/journal/create', { 
@@ -192,15 +204,30 @@ const Home: React.FC = () => {
         </div>
       )}
       <div className="mt-3 flex justify-end">
-        <Button 
-          size="sm" 
-          variant="outline" 
-          className="flex items-center gap-1"
-          onClick={(e) => handleJournalAction(event, e)}
-        >
-          <BookOpen className="h-3.5 w-3.5" />
-          {event.hasJournal ? "View Journal" : "Journal About This"}
-        </Button>
+        {currentUser ? (
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="flex items-center gap-1"
+            onClick={(e) => handleJournalAction(event, e)}
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            {event.hasJournal ? "View Journal" : "Journal About This"}
+          </Button>
+        ) : (
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="flex items-center gap-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate('/auth');
+            }}
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Login to Journal
+          </Button>
+        )}
       </div>
     </div>
   );
