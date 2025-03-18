@@ -39,12 +39,25 @@ const CreateJournalEntry: React.FC = () => {
         if (tagsError) throw tagsError;
         setTags(tagsData);
         
-        // If coming from an event, check if a journal entry already exists for this event
+        // If coming from an event, check if a journal entry already exists for this event AND user
         if (eventData?.id) {
+          // First get current user
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            toast({
+              title: "Authentication Error",
+              description: "You must be logged in to create entries",
+              variant: "destructive"
+            });
+            navigate('/auth');
+            return;
+          }
+          
           const { data, error } = await supabase
             .from('journal_entries')
             .select('id')
             .eq('event_id', eventData.id)
+            .eq('user_id', user.id) // Check only for the current user's entries
             .single();
           
           if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
