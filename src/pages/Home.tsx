@@ -9,6 +9,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
+interface Tag {
+  id: string;
+  name: string;
+  category: string;
+}
+
 interface Event {
   id: string;
   title: string;
@@ -17,12 +23,6 @@ interface Event {
   end_date: string;
   primary_event: boolean;
   tags: string[] | null; // This now contains tag UUIDs instead of tag names
-}
-
-interface Tag {
-  id: string;
-  name: string;
-  category: string;
 }
 
 interface EventWithJournalStatus extends Event {

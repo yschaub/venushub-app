@@ -10,7 +10,7 @@ import JournalEntryEditor from '@/components/JournalEntryEditor';
 interface EventData {
   id: string;
   title: string;
-  tags: string[]; // This now contains tag UUIDs instead of tag names
+  tags: string[]; // This contains tag UUIDs from system_tags
   date: string;
 }
 

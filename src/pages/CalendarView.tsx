@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -8,6 +9,12 @@ import { ChevronLeft, ChevronRight, CalendarIcon, BookText } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+interface Tag {
+  id: string;
+  name: string;
+  category: string;
+}
+
 interface Event {
   id: string;
   title: string;
@@ -15,7 +22,7 @@ interface Event {
   start_date: string;
   end_date: string;
   primary_event: boolean;
-  tags: string[];
+  tags: string[]; // This is now an array of tag UUIDs
   type: 'event';
 }
 
@@ -38,6 +45,24 @@ const CalendarView = () => {
   const [selectedDayItems, setSelectedDayItems] = useState<CalendarItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [tags, setTags] = useState<Tag[]>([]);
+
+  // Fetch tags on component mount
+  useEffect(() => {
+    const fetchTags = async () => {
+      const { data, error } = await supabase
+        .from('system_tags')
+        .select('*');
+      
+      if (error) {
+        console.error('Error fetching tags:', error);
+      } else {
+        setTags(data || []);
+      }
+    };
+    
+    fetchTags();
+  }, []);
 
   // Fetch events and journal entries for the current month
   useEffect(() => {
@@ -130,6 +155,12 @@ const CalendarView = () => {
     if (activeTab === "events") return selectedDayItems.filter(item => item.type === 'event');
     if (activeTab === "journal") return selectedDayItems.filter(item => item.type === 'journal');
     return selectedDayItems;
+  };
+
+  // Helper function to get tag name from tag ID
+  const getTagName = (tagId: string) => {
+    const tag = tags.find(t => t.id === tagId);
+    return tag ? tag.name : 'Unknown';
   };
 
   // Navigate to previous month
@@ -253,8 +284,8 @@ const CalendarView = () => {
                         </div>
                         {item.type === 'event' && (item as Event).tags && (item as Event).tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {(item as Event).tags.map((tag, idx) => (
-                              <Badge key={idx} variant="outline">{tag}</Badge>
+                            {(item as Event).tags.map((tagId, idx) => (
+                              <Badge key={idx} variant="outline">{getTagName(tagId)}</Badge>
                             ))}
                           </div>
                         )}
