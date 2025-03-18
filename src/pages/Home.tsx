@@ -23,9 +23,14 @@ interface TagMapping {
   [key: string]: string;
 }
 
+interface EventWithJournalStatus extends Event {
+  hasJournal?: boolean;
+  journalId?: string;
+}
+
 const Home: React.FC = () => {
-  const [todayEvents, setTodayEvents] = useState<Event[]>([]);
-  const [currentEvents, setCurrentEvents] = useState<Event[]>([]);
+  const [todayEvents, setTodayEvents] = useState<EventWithJournalStatus[]>([]);
+  const [currentEvents, setCurrentEvents] = useState<EventWithJournalStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tagMapping, setTagMapping] = useState<TagMapping>({});
   const { toast } = useToast();
@@ -73,8 +78,37 @@ const Home: React.FC = () => {
           
         if (currentError) throw currentError;
         
-        setTodayEvents(todayData || []);
-        setCurrentEvents(currentData || []);
+        // Check if each event has a journal entry
+        const checkJournalEntries = async (events: Event[]): Promise<EventWithJournalStatus[]> => {
+          const enhancedEvents = await Promise.all(events.map(async (event) => {
+            // Check if this event has a journal entry
+            const { data, error } = await supabase
+              .from('journal_entries')
+              .select('id')
+              .eq('event_id', event.id)
+              .maybeSingle();
+            
+            if (error) {
+              console.error('Error checking journal entry:', error);
+              return { ...event, hasJournal: false };
+            }
+            
+            return { 
+              ...event, 
+              hasJournal: !!data, 
+              journalId: data?.id 
+            };
+          }));
+          
+          return enhancedEvents;
+        };
+        
+        // Enhance events with journal status information
+        const enhancedTodayEvents = await checkJournalEntries(todayData || []);
+        const enhancedCurrentEvents = await checkJournalEntries(currentData || []);
+        
+        setTodayEvents(enhancedTodayEvents);
+        setCurrentEvents(enhancedCurrentEvents);
       } catch (error) {
         console.error('Error fetching events:', error);
         toast({
@@ -90,75 +124,46 @@ const Home: React.FC = () => {
     fetchEvents();
   }, [toast]);
   
-  const handleEventClick = (event: Event) => {
+  const handleEventClick = (event: EventWithJournalStatus) => {
     // Navigate to calendar view with this date selected
     const date = new Date(event.date);
     navigate(`/dashboard/calendar?date=${format(date, 'yyyy-MM-dd')}`);
   };
   
-  const handleJournalAboutEvent = (event: Event, e: React.MouseEvent) => {
+  const handleJournalAction = (event: EventWithJournalStatus, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent event card click from triggering
     
-    // First check if a journal entry already exists for this event
-    const checkExistingEntry = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('journal_entries')
-          .select('id')
-          .eq('event_id', event.id)
-          .single();
-        
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-          throw error;
+    if (event.hasJournal && event.journalId) {
+      // If a journal entry exists, navigate to view/edit it
+      navigate(`/dashboard/journal/edit/${event.journalId}`);
+    } else {
+      // Convert tag names to tag IDs
+      const tagIds = event.tags?.map(tagName => {
+        const id = tagMapping[tagName];
+        if (!id) {
+          console.warn(`No ID found for tag: ${tagName}`);
         }
-        
-        if (data) {
-          // Entry already exists, navigate to edit
-          toast({
-            title: "Journal Entry Exists",
-            description: "A journal entry for this event already exists. Redirecting to edit.",
-          });
-          navigate(`/dashboard/journal/edit/${data.id}`);
-          return;
+        return id;
+      }).filter(Boolean) || [];
+      
+      console.log("Journaling about event:", event);
+      console.log("Event tags mapped to IDs:", tagIds);
+      
+      // Navigate to create with event data
+      navigate('/dashboard/journal/create', { 
+        state: { 
+          eventData: {
+            id: event.id,
+            title: event.title,
+            tags: tagIds,
+            date: event.date
+          } 
         }
-        
-        // Convert tag names to tag IDs
-        const tagIds = event.tags?.map(tagName => {
-          const id = tagMapping[tagName];
-          if (!id) {
-            console.warn(`No ID found for tag: ${tagName}`);
-          }
-          return id;
-        }).filter(Boolean) || [];
-        
-        console.log("Journaling about event:", event);
-        console.log("Event tags mapped to IDs:", tagIds);
-        
-        // Navigate to create with event data
-        navigate('/dashboard/journal/create', { 
-          state: { 
-            eventData: {
-              id: event.id,
-              title: event.title,
-              tags: tagIds,
-              date: event.date
-            } 
-          }
-        });
-      } catch (error) {
-        console.error('Error checking for existing journal entry:', error);
-        toast({
-          title: "Error",
-          description: "There was an error checking for existing journal entries.",
-          variant: "destructive"
-        });
-      }
-    };
-    
-    checkExistingEntry();
+      });
+    }
   };
   
-  const renderEventCard = (event: Event) => (
+  const renderEventCard = (event: EventWithJournalStatus) => (
     <div 
       key={event.id} 
       className="p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
@@ -191,10 +196,10 @@ const Home: React.FC = () => {
           size="sm" 
           variant="outline" 
           className="flex items-center gap-1"
-          onClick={(e) => handleJournalAboutEvent(event, e)}
+          onClick={(e) => handleJournalAction(event, e)}
         >
           <BookOpen className="h-3.5 w-3.5" />
-          Journal About This
+          {event.hasJournal ? "View Journal" : "Journal About This"}
         </Button>
       </div>
     </div>
