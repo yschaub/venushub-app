@@ -143,7 +143,7 @@ const Home: React.FC = () => {
     }
     
     if (event.hasJournal && event.journalId) {
-      navigate(`/dashboard/journal/edit/${event.journalId}`);
+      navigate(`/dashboard/journal/${event.journalId}/edit`);
     } else {
       const tagIds = event.tags?.map(tagName => {
         const id = tagMapping[tagName];
