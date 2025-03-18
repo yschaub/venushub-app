@@ -75,6 +75,7 @@ export type Database = {
       journal_entries: {
         Row: {
           content: string | null
+          date: string
           date_created: string
           id: string
           title: string
@@ -83,6 +84,7 @@ export type Database = {
         }
         Insert: {
           content?: string | null
+          date?: string
           date_created?: string
           id?: string
           title: string
@@ -91,6 +93,7 @@ export type Database = {
         }
         Update: {
           content?: string | null
+          date?: string
           date_created?: string
           id?: string
           title?: string
