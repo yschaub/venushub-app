@@ -51,7 +51,43 @@ const CreateJournalEntry: React.FC = () => {
     };
 
     fetchTags();
-  }, [toast]);
+    
+    // Check if the user already has a journal entry for this event
+    const checkExistingEntry = async () => {
+      if (eventData?.id) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          
+          const { data, error } = await supabase
+            .from('journal_entries')
+            .select('id, title')
+            .eq('user_id', user.id)
+            .eq('event_id', eventData.id)
+            .maybeSingle();
+            
+          if (error) {
+            console.error('Error checking existing entry:', error);
+            return;
+          }
+          
+          if (data) {
+            toast({
+              title: "Note",
+              description: "You already have a journal entry for this event. You will be editing it.",
+              duration: 5000,
+            });
+            // Redirect to edit page
+            navigate(`/dashboard/journal/${data.id}/edit`);
+          }
+        } catch (error) {
+          console.error('Error checking existing entry:', error);
+        }
+      }
+    };
+    
+    checkExistingEntry();
+  }, [toast, eventData, navigate]);
 
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading tags...</div>;
