@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +19,7 @@ const CreateJournalEntry: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Extract event data from location state if it exists
   const eventData = location.state?.eventData as EventData | undefined;
 
@@ -35,45 +34,9 @@ const CreateJournalEntry: React.FC = () => {
           .from('system_tags')
           .select('*')
           .order('name');
-          
+
         if (tagsError) throw tagsError;
         setTags(tagsData);
-        
-        // If coming from an event, check if a journal entry already exists for this event AND user
-        if (eventData?.id) {
-          // First get current user
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            toast({
-              title: "Authentication Error",
-              description: "You must be logged in to create entries",
-              variant: "destructive"
-            });
-            navigate('/auth');
-            return;
-          }
-          
-          const { data, error } = await supabase
-            .from('journal_entries')
-            .select('id')
-            .eq('event_id', eventData.id)
-            .eq('user_id', user.id) // Check only for the current user's entries
-            .single();
-          
-          if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-            console.error('Error checking existing entry:', error);
-          }
-          
-          if (data) {
-            // An entry already exists, navigate to edit
-            toast({
-              title: "Journal Entry Exists",
-              description: "A journal entry for this event already exists. Redirecting to edit.",
-            });
-            navigate(`/dashboard/journal/edit/${data.id}`);
-            return;
-          }
-        }
       } catch (error) {
         console.error('Error fetching tags:', error);
         toast({
@@ -87,7 +50,7 @@ const CreateJournalEntry: React.FC = () => {
     };
 
     fetchTags();
-  }, [toast, navigate, eventData]);
+  }, [toast]);
 
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading tags...</div>;
@@ -96,8 +59,8 @@ const CreateJournalEntry: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           onClick={() => navigate('/dashboard/journal')}
           className="flex items-center gap-2"
         >
@@ -105,18 +68,18 @@ const CreateJournalEntry: React.FC = () => {
           Back to Journal
         </Button>
       </div>
-      
+
       <div className="mb-6">
         <h2 className="text-2xl font-semibold">
           {eventData ? `Journal About: ${eventData.title}` : 'Create New Journal Entry'}
         </h2>
         <p className="text-muted-foreground mt-1">
-          {eventData 
-            ? 'Record your thoughts about this specific event' 
+          {eventData
+            ? 'Record your thoughts about this specific event'
             : 'Record your thoughts, feelings, and experiences'}
         </p>
       </div>
-      
+
       <JournalEntryEditor
         mode="create"
         tags={tags}

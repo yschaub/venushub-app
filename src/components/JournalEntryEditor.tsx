@@ -89,7 +89,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             .select('date')
             .eq('id', entryId)
             .single();
-            
+
           if (error) throw error;
           if (data?.date) {
             setEntryDate(new Date(data.date));
@@ -98,7 +98,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           console.error('Error fetching entry date:', error);
         }
       };
-      
+
       fetchEntryDetails();
     }
   }, [mode, entryId]);
@@ -111,9 +111,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             .from('journal_entry_tags')
             .select('tag_id')
             .eq('journal_entry_id', entryId);
-            
+
           if (error) throw error;
-          
+
           if (data) {
             const tagIds = data.map(tag => tag.tag_id);
             setSelectedTags(tagIds);
@@ -122,21 +122,21 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           console.error('Error fetching journal entry tags:', error);
         }
       };
-      
+
       fetchJournalEntryTags();
     }
   }, [mode, entryId]);
 
   const tagsByCategory = React.useMemo(() => {
     const grouped: { [key: string]: Tag[] } = {};
-    
+
     tags.forEach(tag => {
       if (!grouped[tag.category]) {
         grouped[tag.category] = [];
       }
       grouped[tag.category].push(tag);
     });
-    
+
     return grouped;
   }, [tags]);
 
@@ -159,9 +159,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             .select('*')
             .eq('journal_entry_id', entryId)
             .order('created_at', { ascending: true });
-            
+
           if (error) throw error;
-          
+
           const transformedData = data?.map(item => ({
             id: item.id,
             content: item.content,
@@ -171,7 +171,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             selection_start: item.selection_start,
             selection_end: item.selection_end
           })) || [];
-          
+
           setAnnotations(transformedData);
         } catch (error) {
           console.error('Error fetching annotations:', error);
@@ -194,18 +194,18 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
 
   const handleAddAnnotation = () => {
     if (!selectedText || !annotationContent.trim() || !editorRef.current) return;
-    
+
     try {
       editorRef.current.addAnnotation(annotationContent);
-      
+
       const editorAnnotations = editorRef.current.getAnnotations();
       const newAnnotations = convertAnnotations(editorAnnotations);
-      
+
       setAnnotations(newAnnotations);
       setAnnotationContent('');
       setSelectedText(null);
       setShowAnnotationForm(false);
-      
+
       toast({
         title: "Success",
         description: "Annotation added successfully"
@@ -227,16 +227,16 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           .from('journal_entry_annotations')
           .delete()
           .eq('id', annotationId);
-          
+
         if (error) throw error;
       }
-      
+
       setAnnotations(annotations.filter(a => a.id !== annotationId));
-      
+
       if (editorRef.current) {
         editorRef.current.removeAnnotation(annotationId);
       }
-      
+
       toast({
         title: "Success",
         description: "Annotation deleted successfully"
@@ -252,7 +252,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   };
 
   const handleTagToggle = (tagId: string) => {
-    setSelectedTags(prev => 
+    setSelectedTags(prev =>
       prev.includes(tagId)
         ? prev.filter(id => id !== tagId)
         : [...prev, tagId]
@@ -262,7 +262,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -273,11 +273,11 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
         });
         return;
       }
-      
+
       const editorHtml = editorRef.current?.getHTML() || content;
       const editorAnnotations = editorRef.current?.getAnnotations() || [];
       const formattedDate = entryDate ? format(entryDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
-      
+
       if (mode === 'create') {
         const { data: entry, error: entryError } = await supabase
           .from('journal_entries')
@@ -290,22 +290,22 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           })
           .select()
           .single();
-          
+
         if (entryError) throw entryError;
-        
+
         if (selectedTags.length > 0) {
           const tagInserts = selectedTags.map((tagId: string) => ({
             journal_entry_id: entry.id,
             tag_id: tagId
           }));
-          
+
           const { error: tagError } = await supabase
             .from('journal_entry_tags')
             .insert(tagInserts);
-            
+
           if (tagError) throw tagError;
         }
-        
+
         if (editorAnnotations.length > 0) {
           const annotationInserts = editorAnnotations.map((annotation) => ({
             id: annotation.id,
@@ -314,18 +314,18 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             journal_entry_id: entry.id,
             user_id: user.id
           }));
-          
+
           const { error: annotationError } = await supabase
             .from('journal_entry_annotations')
             .insert(annotationInserts);
-            
+
           if (annotationError) throw annotationError;
         }
-        
+
         toast({
           title: "Success",
-          description: eventId 
-            ? "Journal entry for event created successfully" 
+          description: eventId
+            ? "Journal entry for event created successfully"
             : "Journal entry created successfully"
         });
       } else if (mode === 'edit' && entryId) {
@@ -338,41 +338,41 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             updated_at: new Date().toISOString()
           })
           .eq('id', entryId);
-          
+
         if (entryError) throw entryError;
-        
+
         const { error: deleteTagsError } = await supabase
           .from('journal_entry_tags')
           .delete()
           .eq('journal_entry_id', entryId);
-          
+
         if (deleteTagsError) throw deleteTagsError;
-        
+
         if (selectedTags.length > 0) {
           const tagInserts = selectedTags.map(tagId => ({
             journal_entry_id: entryId,
             tag_id: tagId
           }));
-          
+
           const { error: insertTagsError } = await supabase
             .from('journal_entry_tags')
             .insert(tagInserts);
-            
+
           if (insertTagsError) throw insertTagsError;
         }
-        
+
         const { data: existingAnnotations, error: fetchAnnotationsError } = await supabase
           .from('journal_entry_annotations')
           .select('id')
           .eq('journal_entry_id', entryId);
-          
+
         if (fetchAnnotationsError) throw fetchAnnotationsError;
-        
+
         const existingIds = new Set(existingAnnotations?.map(a => a.id) || []);
         const currentIds = new Set(editorAnnotations.map(a => a.id));
-        
+
         const annotationsToCreate = editorAnnotations.filter(a => !existingIds.has(a.id));
-        
+
         if (annotationsToCreate.length > 0) {
           const createPayload = annotationsToCreate.map(a => ({
             id: a.id,
@@ -381,31 +381,31 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             journal_entry_id: entryId,
             user_id: user.id
           }));
-          
+
           const { error: createAnnotationsError } = await supabase
             .from('journal_entry_annotations')
             .insert(createPayload);
-            
+
           if (createAnnotationsError) throw createAnnotationsError;
         }
-        
+
         const annotationsToDelete = Array.from(existingIds).filter(id => !currentIds.has(id));
-        
+
         if (annotationsToDelete.length > 0) {
           const { error: deleteAnnotationsError } = await supabase
             .from('journal_entry_annotations')
             .delete()
             .in('id', annotationsToDelete);
-            
+
           if (deleteAnnotationsError) throw deleteAnnotationsError;
         }
-        
+
         toast({
           title: "Success",
           description: "Journal entry updated successfully"
         });
       }
-      
+
       onSuccess();
     } catch (error) {
       console.error('Error saving journal entry:', error);
@@ -440,7 +440,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                 required
               />
             </div>
-            
+
             <div>
               <Label htmlFor="date">Date</Label>
               <Popover>
@@ -464,7 +464,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                 </PopoverContent>
               </Popover>
             </div>
-            
+
             <div>
               <Label htmlFor="content">Content</Label>
               <div className="min-h-[200px] border rounded-md">
@@ -478,7 +478,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                 />
               </div>
             </div>
-            
+
             {showAnnotationForm && selectedText && (
               <div className="border p-4 rounded-md bg-muted/30">
                 <h3 className="text-sm font-medium mb-2">Add annotation for:</h3>
@@ -493,9 +493,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                   rows={3}
                 />
                 <div className="flex justify-end gap-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     size="sm"
                     onClick={() => {
                       setShowAnnotationForm(false);
@@ -504,8 +504,8 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     size="sm"
                     onClick={handleAddAnnotation}
                   >
@@ -514,7 +514,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                 </div>
               </div>
             )}
-            
+
             {Object.keys(tagsByCategory).length > 0 && (
               <div className="space-y-2">
                 <Label>Tags</Label>
@@ -545,7 +545,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                 </Accordion>
               </div>
             )}
-            
+
             {eventId && (
               <div className="bg-muted/30 p-4 rounded-md">
                 <p className="text-sm text-muted-foreground">
@@ -553,11 +553,11 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                 </p>
               </div>
             )}
-            
+
             <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={onCancel}
                 disabled={isLoading}
               >
@@ -570,8 +570,8 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           </form>
         </Card>
       </div>
-      
-      <AnnotationSidebar 
+
+      <AnnotationSidebar
         annotations={annotations}
         onDeleteAnnotation={handleDeleteAnnotation}
         onAnnotationClick={handleAnnotationClick}
