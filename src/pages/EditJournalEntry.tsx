@@ -24,7 +24,9 @@ const EditJournalEntry: React.FC = () => {
         setIsLoading(true);
         
         // First get current user
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        
         if (!user) {
           toast({
             title: "Authentication Error",
@@ -35,13 +37,13 @@ const EditJournalEntry: React.FC = () => {
           return;
         }
         
-        // Fetch journal entry
+        // Fetch journal entry - directly query by ID and user_id
         const { data: entryData, error: entryError } = await supabase
           .from('journal_entries')
           .select('*')
           .eq('id', id)
-          .eq('user_id', user.id) // Only fetch if it belongs to the current user
-          .maybeSingle(); // Use maybeSingle instead of single to prevent errors if no entry is found
+          .eq('user_id', user.id)
+          .maybeSingle();
           
         if (entryError) {
           console.error('Error fetching entry:', entryError);
@@ -58,13 +60,18 @@ const EditJournalEntry: React.FC = () => {
           return;
         }
         
+        console.log("Found journal entry:", entryData);
+        
         // Fetch tags for this entry
         const { data: entryTags, error: entryTagsError } = await supabase
           .from('journal_entry_tags')
           .select('tag_id')
           .eq('journal_entry_id', id);
           
-        if (entryTagsError) throw entryTagsError;
+        if (entryTagsError) {
+          console.error('Error fetching entry tags:', entryTagsError);
+          throw entryTagsError;
+        }
         
         // Fetch all available tags
         const { data: tagsData, error: tagsError } = await supabase
@@ -72,7 +79,10 @@ const EditJournalEntry: React.FC = () => {
           .select('*')
           .order('name');
           
-        if (tagsError) throw tagsError;
+        if (tagsError) {
+          console.error('Error fetching tags:', tagsError);
+          throw tagsError;
+        }
         
         setEntry(entryData);
         setSelectedTags(entryTags.map((tag: any) => tag.tag_id));
