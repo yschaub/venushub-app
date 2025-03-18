@@ -76,7 +76,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   const editorRef = useRef<RichTextEditorRef>(null);
   const { toast } = useToast();
 
-  // Use effect to load the entry date when in edit mode
+  console.log("Initial tags from event:", initialValues.tags);
+  console.log("Selected tags state:", selectedTags);
+
   useEffect(() => {
     if (mode === 'edit' && entryId) {
       const fetchEntryDetails = async () => {
@@ -100,7 +102,30 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     }
   }, [mode, entryId]);
 
-  // Rest of the tagsByCategory code
+  useEffect(() => {
+    if (mode === 'edit' && entryId) {
+      const fetchJournalEntryTags = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('journal_entry_tags')
+            .select('tag_id')
+            .eq('journal_entry_id', entryId);
+            
+          if (error) throw error;
+          
+          if (data) {
+            const tagIds = data.map(tag => tag.tag_id);
+            setSelectedTags(tagIds);
+          }
+        } catch (error) {
+          console.error('Error fetching journal entry tags:', error);
+        }
+      };
+      
+      fetchJournalEntryTags();
+    }
+  }, [mode, entryId]);
+
   const tagsByCategory = React.useMemo(() => {
     const grouped: { [key: string]: Tag[] } = {};
     
@@ -113,16 +138,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     
     return grouped;
   }, [tags]);
-
-  useEffect(() => {
-    if (initialValues.tags.length > 0 && tags.length > 0) {
-      // Map tag IDs to tag objects for display
-      const validTagIds = initialValues.tags.filter(tagId => 
-        tags.some(tag => tag.id === tagId)
-      );
-      setSelectedTags(validTagIds);
-    }
-  }, [initialValues.tags, tags]);
 
   const convertAnnotations = (editorAnnotations: AnnotationMark[]): Annotation[] => {
     return editorAnnotations.map(annotation => ({
@@ -206,7 +221,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
 
   const handleDeleteAnnotation = async (annotationId: string) => {
     try {
-      // Remove from database if in edit mode
       if (mode === 'edit' && entryId) {
         const { error } = await supabase
           .from('journal_entry_annotations')
@@ -216,10 +230,8 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
         if (error) throw error;
       }
       
-      // Remove from local state
       setAnnotations(annotations.filter(a => a.id !== annotationId));
       
-      // Remove from editor content - this is the key change
       if (editorRef.current) {
         editorRef.current.removeAnnotation(annotationId);
       }

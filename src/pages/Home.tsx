@@ -77,6 +77,11 @@ const Home: React.FC = () => {
   
   const handleJournalAboutEvent = (event: Event, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent event card click from triggering
+    
+    // Log the event and its tags to verify what's being passed
+    console.log("Journaling about event:", event);
+    console.log("Event tags:", event.tags);
+    
     navigate('/dashboard/journal/create', { 
       state: { 
         eventData: {
