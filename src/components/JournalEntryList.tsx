@@ -17,7 +17,7 @@ interface JournalEntry {
   title: string;
   content: string;
   date_created: string;
-  tags: string[];
+  tags: string[]; // This now contains tag UUIDs instead of tag names
 }
 
 interface JournalEntryListProps {

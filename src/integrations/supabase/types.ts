@@ -34,10 +34,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "event_relationships_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_with_tag_names"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "event_relationships_related_event_id_fkey"
             columns: ["related_event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_relationships_related_event_id_fkey"
+            columns: ["related_event_id"]
+            isOneToOne: false
+            referencedRelation: "events_with_tag_names"
             referencedColumns: ["id"]
           },
         ]
@@ -69,6 +83,36 @@ export type Database = {
           start_date?: string
           tags?: string[] | null
           title?: string
+        }
+        Relationships: []
+      }
+      events_backup: {
+        Row: {
+          date: string | null
+          end_date: string | null
+          id: string | null
+          primary_event: boolean | null
+          start_date: string | null
+          tags: string[] | null
+          title: string | null
+        }
+        Insert: {
+          date?: string | null
+          end_date?: string | null
+          id?: string | null
+          primary_event?: boolean | null
+          start_date?: string | null
+          tags?: string[] | null
+          title?: string | null
+        }
+        Update: {
+          date?: string | null
+          end_date?: string | null
+          id?: string | null
+          primary_event?: boolean | null
+          start_date?: string | null
+          tags?: string[] | null
+          title?: string | null
         }
         Relationships: []
       }
@@ -109,6 +153,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_with_tag_names"
             referencedColumns: ["id"]
           },
         ]
@@ -329,7 +380,36 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      events_with_tag_names: {
+        Row: {
+          date: string | null
+          end_date: string | null
+          id: string | null
+          primary_event: boolean | null
+          start_date: string | null
+          tag_names: string[] | null
+          title: string | null
+        }
+        Insert: {
+          date?: string | null
+          end_date?: string | null
+          id?: string | null
+          primary_event?: boolean | null
+          start_date?: string | null
+          tag_names?: never
+          title?: string | null
+        }
+        Update: {
+          date?: string | null
+          end_date?: string | null
+          id?: string | null
+          primary_event?: boolean | null
+          start_date?: string | null
+          tag_names?: never
+          title?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

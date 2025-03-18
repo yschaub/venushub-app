@@ -10,7 +10,7 @@ import JournalEntryEditor from '@/components/JournalEntryEditor';
 interface EventData {
   id: string;
   title: string;
-  tags: string[];
+  tags: string[]; // This now contains tag UUIDs instead of tag names
   date: string;
 }
 
@@ -123,7 +123,7 @@ const CreateJournalEntry: React.FC = () => {
         initialValues={{
           title: eventData?.title || '',
           content: '',
-          tags: eventData?.tags || []
+          tags: eventData?.tags || [] // These are already tag UUIDs
         }}
         eventId={eventData?.id}
         eventDate={eventData?.date}

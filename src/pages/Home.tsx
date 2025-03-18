@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,11 +16,13 @@ interface Event {
   start_date: string;
   end_date: string;
   primary_event: boolean;
-  tags: string[] | null;
+  tags: string[] | null; // This now contains tag UUIDs instead of tag names
 }
 
-interface TagMapping {
-  [key: string]: string;
+interface Tag {
+  id: string;
+  name: string;
+  category: string;
 }
 
 interface EventWithJournalStatus extends Event {
@@ -31,7 +34,7 @@ const Home: React.FC = () => {
   const [todayEvents, setTodayEvents] = useState<EventWithJournalStatus[]>([]);
   const [currentEvents, setCurrentEvents] = useState<EventWithJournalStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [tagMapping, setTagMapping] = useState<TagMapping>({});
+  const [tags, setTags] = useState<Tag[]>([]);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -55,20 +58,16 @@ const Home: React.FC = () => {
         const today = new Date();
         const formattedToday = format(today, 'yyyy-MM-dd');
         
+        // Fetch all tags to use for mapping IDs to names
         const { data: tagsData, error: tagsError } = await supabase
           .from('system_tags')
           .select('*')
           .order('name');
           
         if (tagsError) throw tagsError;
+        setTags(tagsData || []);
         
-        const mapping: TagMapping = {};
-        tagsData?.forEach(tag => {
-          mapping[tag.name] = tag.id;
-        });
-        
-        setTagMapping(mapping);
-        
+        // Fetch events for today
         const { data: todayData, error: todayError } = await supabase
           .from('events')
           .select('*')
@@ -76,6 +75,7 @@ const Home: React.FC = () => {
           
         if (todayError) throw todayError;
         
+        // Fetch current events (spanning today)
         const { data: currentData, error: currentError } = await supabase
           .from('events')
           .select('*')
@@ -145,25 +145,22 @@ const Home: React.FC = () => {
     if (event.hasJournal && event.journalId) {
       navigate(`/dashboard/journal/${event.journalId}/edit`);
     } else {
-      const tagIds = event.tags?.map(tagName => {
-        const id = tagMapping[tagName];
-        if (!id) {
-          console.warn(`No ID found for tag: ${tagName}`);
-        }
-        return id;
-      }).filter(Boolean) || [];
-      
       navigate('/dashboard/journal/create', { 
         state: { 
           eventData: {
             id: event.id,
             title: event.title,
-            tags: tagIds,
+            tags: event.tags || [], // These are already tag UUIDs
             date: event.date
           } 
         }
       });
     }
+  };
+  
+  const getTagName = (tagId: string) => {
+    const tag = tags.find(t => t.id === tagId);
+    return tag ? tag.name : '';
   };
   
   const renderEventCard = (event: EventWithJournalStatus) => (
@@ -189,8 +186,8 @@ const Home: React.FC = () => {
       </div>
       {event.tags && event.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {event.tags.map((tag, idx) => (
-            <Badge key={idx} variant="outline">{tag}</Badge>
+          {event.tags.map((tagId, idx) => (
+            <Badge key={idx} variant="outline">{getTagName(tagId)}</Badge>
           ))}
         </div>
       )}
