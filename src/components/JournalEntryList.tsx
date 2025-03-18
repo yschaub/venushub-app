@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -17,7 +16,7 @@ interface JournalEntry {
   id: string;
   title: string;
   content: string;
-  date_created: string;
+  date: string;
   tags: string[]; // This now contains tag UUIDs instead of tag names
 }
 
@@ -70,7 +69,7 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
       'Cycle': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
       'Houses': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
     };
-    
+
     return categoryColors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
   };
 
@@ -101,7 +100,7 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              {format(new Date(entry.date_created), 'MMMM d, yyyy')}
+              {format(new Date(entry.date), 'MMMM d, yyyy')}
             </div>
           </CardHeader>
           <CardContent>
@@ -110,8 +109,8 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
           {entry.tags && entry.tags.length > 0 && (
             <CardFooter className="pt-0 flex flex-wrap gap-2">
               {entry.tags.map(tagId => (
-                <Badge 
-                  key={tagId} 
+                <Badge
+                  key={tagId}
                   variant="outline"
                   className={`${getCategoryColor(getTagCategory(tagId))} border-0`}
                 >
