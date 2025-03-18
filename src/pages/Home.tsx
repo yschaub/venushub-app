@@ -4,9 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { CalendarIcon, AlertCircle } from 'lucide-react';
+import { CalendarIcon, AlertCircle, BookOpen } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 interface Event {
   id: string;
@@ -74,6 +75,62 @@ const Home: React.FC = () => {
     navigate(`/dashboard/calendar?date=${format(date, 'yyyy-MM-dd')}`);
   };
   
+  const handleJournalAboutEvent = (event: Event, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent event card click from triggering
+    navigate('/dashboard/journal/create', { 
+      state: { 
+        eventData: {
+          id: event.id,
+          title: event.title,
+          tags: event.tags || [],
+          date: event.date
+        } 
+      }
+    });
+  };
+  
+  const renderEventCard = (event: Event) => (
+    <div 
+      key={event.id} 
+      className="p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+      onClick={() => handleEventClick(event)}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="font-semibold text-lg">{event.title}</h3>
+          <div className="flex items-center text-sm text-muted-foreground mt-1">
+            <CalendarIcon className="mr-1 h-4 w-4" />
+            <span>
+              {event === todayEvents[0] ? 'Today' : 
+                `${format(new Date(event.start_date), 'MMM d')} - ${format(new Date(event.end_date), 'MMM d, yyyy')}`}
+            </span>
+          </div>
+        </div>
+        {event.primary_event && (
+          <Badge variant="default" className="bg-primary">Primary</Badge>
+        )}
+      </div>
+      {event.tags && event.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {event.tags.map((tag, idx) => (
+            <Badge key={idx} variant="outline">{tag}</Badge>
+          ))}
+        </div>
+      )}
+      <div className="mt-3 flex justify-end">
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="flex items-center gap-1"
+          onClick={(e) => handleJournalAboutEvent(event, e)}
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          Journal About This
+        </Button>
+      </div>
+    </div>
+  );
+  
   return (
     <div className="p-6 space-y-6">
       <h2 className="text-2xl font-semibold mb-4">Welcome to VenusHub</h2>
@@ -98,33 +155,7 @@ const Home: React.FC = () => {
             <CardContent>
               {todayEvents.length > 0 ? (
                 <div className="space-y-4">
-                  {todayEvents.map((event) => (
-                    <div 
-                      key={event.id} 
-                      className="p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
-                      onClick={() => handleEventClick(event)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg">{event.title}</h3>
-                          <div className="flex items-center text-sm text-muted-foreground mt-1">
-                            <CalendarIcon className="mr-1 h-4 w-4" />
-                            <span>Today</span>
-                          </div>
-                        </div>
-                        {event.primary_event && (
-                          <Badge variant="default" className="bg-primary">Primary</Badge>
-                        )}
-                      </div>
-                      {event.tags && event.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {event.tags.map((tag, idx) => (
-                            <Badge key={idx} variant="outline">{tag}</Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  {todayEvents.map(event => renderEventCard(event))}
                 </div>
               ) : (
                 <div className="text-center py-6 text-muted-foreground">
@@ -148,35 +179,7 @@ const Home: React.FC = () => {
             <CardContent>
               {currentEvents.length > 0 ? (
                 <div className="space-y-4">
-                  {currentEvents.map((event) => (
-                    <div 
-                      key={event.id} 
-                      className="p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
-                      onClick={() => handleEventClick(event)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg">{event.title}</h3>
-                          <div className="flex items-center text-sm text-muted-foreground mt-1">
-                            <CalendarIcon className="mr-1 h-4 w-4" />
-                            <span>
-                              {format(new Date(event.start_date), 'MMM d')} - {format(new Date(event.end_date), 'MMM d, yyyy')}
-                            </span>
-                          </div>
-                        </div>
-                        {event.primary_event && (
-                          <Badge variant="default" className="bg-primary">Primary</Badge>
-                        )}
-                      </div>
-                      {event.tags && event.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {event.tags.map((tag, idx) => (
-                            <Badge key={idx} variant="outline">{tag}</Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  {currentEvents.map(event => renderEventCard(event))}
                 </div>
               ) : (
                 <div className="text-center py-6 text-muted-foreground">

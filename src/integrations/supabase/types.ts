@@ -77,6 +77,7 @@ export type Database = {
           content: string | null
           date: string
           date_created: string
+          event_id: string | null
           id: string
           title: string
           updated_at: string
@@ -86,6 +87,7 @@ export type Database = {
           content?: string | null
           date?: string
           date_created?: string
+          event_id?: string | null
           id?: string
           title: string
           updated_at?: string
@@ -95,12 +97,21 @@ export type Database = {
           content?: string | null
           date?: string
           date_created?: string
+          event_id?: string | null
           id?: string
           title?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       journal_entry_annotations: {
         Row: {

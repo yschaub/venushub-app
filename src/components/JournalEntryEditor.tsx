@@ -38,6 +38,7 @@ interface JournalEntryEditorProps {
     content: string;
     tags: string[];
   };
+  eventId?: string;
   tags: Tag[];
   onSuccess: () => void;
   onCancel: () => void;
@@ -47,6 +48,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   mode,
   entryId,
   initialValues = { title: '', content: '', tags: [] },
+  eventId,
   tags,
   onSuccess,
   onCancel
@@ -78,6 +80,17 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     
     return grouped;
   }, [tags]);
+
+  // Fetch tag names for the selected tags
+  useEffect(() => {
+    if (initialValues.tags.length > 0 && tags.length > 0) {
+      // Map tag IDs to tag objects for display
+      const validTagIds = initialValues.tags.filter(tagId => 
+        tags.some(tag => tag.id === tagId)
+      );
+      setSelectedTags(validTagIds);
+    }
+  }, [initialValues.tags, tags]);
 
   const convertAnnotations = (editorAnnotations: AnnotationMark[]): Annotation[] => {
     return editorAnnotations.map(annotation => ({
@@ -225,7 +238,8 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           .insert({
             title,
             content: editorHtml,
-            user_id: user.id
+            user_id: user.id,
+            event_id: eventId || null
           })
           .select()
           .single();
@@ -263,7 +277,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
         
         toast({
           title: "Success",
-          description: "Journal entry created successfully"
+          description: eventId 
+            ? "Journal entry for event created successfully" 
+            : "Journal entry created successfully"
         });
       } else if (mode === 'edit' && entryId) {
         const { error: entryError } = await supabase
@@ -455,6 +471,14 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                     </AccordionItem>
                   ))}
                 </Accordion>
+              </div>
+            )}
+            
+            {eventId && (
+              <div className="bg-muted/30 p-4 rounded-md">
+                <p className="text-sm text-muted-foreground">
+                  This journal entry will be linked to the selected event.
+                </p>
               </div>
             )}
             
