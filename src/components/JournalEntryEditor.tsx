@@ -39,6 +39,7 @@ interface JournalEntryEditorProps {
     tags: string[];
   };
   eventId?: string;
+  eventDate?: string; // Added eventDate prop
   tags: Tag[];
   onSuccess: () => void;
   onCancel: () => void;
@@ -49,6 +50,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   entryId,
   initialValues = { title: '', content: '', tags: [] },
   eventId,
+  eventDate, // Added eventDate parameter
   tags,
   onSuccess,
   onCancel
@@ -239,7 +241,8 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             title,
             content: editorHtml,
             user_id: user.id,
-            event_id: eventId || null
+            event_id: eventId || null,
+            date: eventDate || new Date().toISOString().split('T')[0] // Use event date if available
           })
           .select()
           .single();

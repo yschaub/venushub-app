@@ -87,6 +87,7 @@ const CreateJournalEntry: React.FC = () => {
           tags: eventData?.tags || []
         }}
         eventId={eventData?.id}
+        eventDate={eventData?.date} // Pass the event date if available
         onSuccess={() => navigate('/dashboard/journal')}
         onCancel={() => navigate('/dashboard/journal')}
       />
