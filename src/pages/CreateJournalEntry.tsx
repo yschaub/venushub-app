@@ -24,6 +24,9 @@ const CreateJournalEntry: React.FC = () => {
   // Extract event data from location state if it exists
   const eventData = location.state?.eventData as EventData | undefined;
 
+  // Log the event data for debugging
+  console.log("Event data received:", eventData);
+
   useEffect(() => {
     const fetchTags = async () => {
       try {
@@ -87,7 +90,7 @@ const CreateJournalEntry: React.FC = () => {
           tags: eventData?.tags || []
         }}
         eventId={eventData?.id}
-        eventDate={eventData?.date} // Pass the event date if available
+        eventDate={eventData?.date}
         onSuccess={() => navigate('/dashboard/journal')}
         onCancel={() => navigate('/dashboard/journal')}
       />

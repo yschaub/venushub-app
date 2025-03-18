@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +10,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import AnnotationSidebar from '@/components/AnnotationSidebar';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Accordion, AccordionContent, AccordionItem,  AccordionTrigger } from '@/components/ui/accordion';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import RichTextEditor, { RichTextEditorRef, AnnotationMark } from './editor/RichTextEditor';
 
 interface Tag {
@@ -39,7 +42,7 @@ interface JournalEntryEditorProps {
     tags: string[];
   };
   eventId?: string;
-  eventDate?: string; // Added eventDate prop
+  eventDate?: string;
   tags: Tag[];
   onSuccess: () => void;
   onCancel: () => void;
@@ -50,7 +53,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   entryId,
   initialValues = { title: '', content: '', tags: [] },
   eventId,
-  eventDate, // Added eventDate parameter
+  eventDate,
   tags,
   onSuccess,
   onCancel
@@ -67,9 +70,37 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   } | null>(null);
   const [annotationContent, setAnnotationContent] = useState('');
   const [showAnnotationForm, setShowAnnotationForm] = useState(false);
+  const [entryDate, setEntryDate] = useState<Date | undefined>(
+    eventDate ? new Date(eventDate) : new Date()
+  );
   const editorRef = useRef<RichTextEditorRef>(null);
   const { toast } = useToast();
 
+  // Use effect to load the entry date when in edit mode
+  useEffect(() => {
+    if (mode === 'edit' && entryId) {
+      const fetchEntryDetails = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('journal_entries')
+            .select('date')
+            .eq('id', entryId)
+            .single();
+            
+          if (error) throw error;
+          if (data?.date) {
+            setEntryDate(new Date(data.date));
+          }
+        } catch (error) {
+          console.error('Error fetching entry date:', error);
+        }
+      };
+      
+      fetchEntryDetails();
+    }
+  }, [mode, entryId]);
+
+  // Rest of the tagsByCategory code
   const tagsByCategory = React.useMemo(() => {
     const grouped: { [key: string]: Tag[] } = {};
     
@@ -83,7 +114,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     return grouped;
   }, [tags]);
 
-  // Fetch tag names for the selected tags
   useEffect(() => {
     if (initialValues.tags.length > 0 && tags.length > 0) {
       // Map tag IDs to tag objects for display
@@ -233,6 +263,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
       
       const editorHtml = editorRef.current?.getHTML() || content;
       const editorAnnotations = editorRef.current?.getAnnotations() || [];
+      const formattedDate = entryDate ? format(entryDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
       
       if (mode === 'create') {
         const { data: entry, error: entryError } = await supabase
@@ -242,7 +273,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             content: editorHtml,
             user_id: user.id,
             event_id: eventId || null,
-            date: eventDate || new Date().toISOString().split('T')[0] // Use event date if available
+            date: formattedDate
           })
           .select()
           .single();
@@ -290,6 +321,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           .update({
             title,
             content: editorHtml,
+            date: formattedDate,
             updated_at: new Date().toISOString()
           })
           .eq('id', entryId);
@@ -394,6 +426,30 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                 placeholder="Entry title"
                 required
               />
+            </div>
+            
+            <div>
+              <Label htmlFor="date">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                    id="date"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {entryDate ? format(entryDate, 'PPP') : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={entryDate}
+                    onSelect={(date) => setEntryDate(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             
             <div>
