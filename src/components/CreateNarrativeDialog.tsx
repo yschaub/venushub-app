@@ -16,6 +16,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 
+interface Tag {
+  id: string;
+  name: string;
+}
+
 interface CreateNarrativeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,7 +44,7 @@ const CreateNarrativeDialog = ({
 }: CreateNarrativeDialogProps) => {
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [matchingEntriesCount, setMatchingEntriesCount] = useState<number | null>(null);
   const [isLoadingCount, setIsLoadingCount] = useState(false);
