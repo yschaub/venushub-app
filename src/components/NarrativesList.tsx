@@ -112,8 +112,8 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
         description: "Narrative deleted successfully",
       });
       
-      // Refresh narratives list
-      fetchNarratives();
+      // Refresh the page to update both the list and the sidebar
+      window.location.reload();
     } catch (error: any) {
       console.error('Error deleting narrative:', error);
       toast({

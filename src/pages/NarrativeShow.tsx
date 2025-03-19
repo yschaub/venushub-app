@@ -197,8 +197,9 @@ const NarrativeShow: React.FC = () => {
                 description: "Narrative deleted successfully",
             });
             
-            // Navigate back to narratives page
+            // Navigate back to narratives page and refresh the page to update the sidebar
             navigate('/dashboard/narratives');
+            window.location.reload();
         } catch (error: any) {
             console.error('Error deleting narrative:', error);
             toast({
