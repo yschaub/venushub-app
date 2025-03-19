@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, BookOpen, Edit } from 'lucide-react';
+import { PlusCircle, BookOpen, Edit, Trash2 } from 'lucide-react';
 import CreateNarrativeDialog from './CreateNarrativeDialog';
 
 interface Narrative {
@@ -98,6 +98,32 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
     setEditDialogOpen(true);
   };
 
+  const handleDeleteNarrative = async (narrativeId: string) => {
+    try {
+      const { error } = await supabase
+        .from('narratives')
+        .delete()
+        .eq('id', narrativeId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Narrative deleted successfully",
+      });
+      
+      // Refresh narratives list
+      fetchNarratives();
+    } catch (error: any) {
+      console.error('Error deleting narrative:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete narrative",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoading) {
     return <div className="py-4 text-center">Loading narratives...</div>;
   }
@@ -143,14 +169,25 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-base">{narrative.title}</CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleEditNarrative(narrative)}
-                    title="Edit narrative"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteNarrative(narrative.id)}
+                      title="Delete narrative"
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditNarrative(narrative)}
+                      title="Edit narrative"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

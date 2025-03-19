@@ -6,9 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { ChevronLeft, BookOpen, Edit, Tag } from 'lucide-react';
+import { ChevronLeft, BookOpen, Edit, Tag, Trash2 } from 'lucide-react';
 import CreateNarrativeDialog from '@/components/CreateNarrativeDialog';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Narrative {
     id: string;
@@ -41,6 +42,7 @@ const NarrativeShow: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [narrativeTags, setNarrativeTags] = useState<Tag[]>([]);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
     useEffect(() => {
         const fetchNarrativeAndEntries = async () => {
@@ -178,6 +180,37 @@ const NarrativeShow: React.FC = () => {
         }
     };
 
+    const handleDeleteNarrative = async () => {
+        if (!id) return;
+        
+        try {
+            // Delete the narrative
+            const { error } = await supabase
+                .from('narratives')
+                .delete()
+                .eq('id', id);
+            
+            if (error) throw error;
+            
+            toast({
+                title: "Success",
+                description: "Narrative deleted successfully",
+            });
+            
+            // Navigate back to narratives page
+            navigate('/dashboard/narratives');
+        } catch (error: any) {
+            console.error('Error deleting narrative:', error);
+            toast({
+                title: "Error",
+                description: "Failed to delete narrative",
+                variant: "destructive"
+            });
+        } finally {
+            setDeleteDialogOpen(false);
+        }
+    };
+
     if (isLoading) {
         return <div className="p-6 flex justify-center">Loading narrative...</div>;
     }
@@ -223,15 +256,25 @@ const NarrativeShow: React.FC = () => {
                         <span className="text-2xl">{getCategoryIcon(narrative.category_type)}</span>
                         <h2 className="text-2xl font-semibold">{narrative.title}</h2>
                     </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditDialogOpen(true)}
-                        className="flex items-center gap-1"
-                    >
-                        <Edit className="h-4 w-4" />
-                        Edit
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteDialogOpen(true)}
+                            className="flex items-center gap-1 text-muted-foreground hover:text-destructive"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditDialogOpen(true)}
+                            className="flex items-center gap-1"
+                        >
+                            <Edit className="h-4 w-4" />
+                            Edit
+                        </Button>
+                    </div>
                 </div>
                 <p className="text-muted-foreground">
                     Category: {narrative.category_name}
@@ -307,6 +350,29 @@ const NarrativeShow: React.FC = () => {
                 }}
                 onNarrativeCreated={() => {}}
             />
+            
+            {/* Confirmation Dialog for Delete */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Narrative</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this narrative? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex space-x-2 justify-end">
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button 
+                            variant="destructive" 
+                            onClick={handleDeleteNarrative}
+                        >
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
