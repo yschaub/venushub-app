@@ -35,11 +35,16 @@ const Dashboard: React.FC = () => {
 
         // Find journal entries that have ALL the required tags for this narrative
         // First, get the journal entries with ANY of the required tags
+        // Fix: Cast required_tags as a string[] array and use type assertion to avoid deep instantiation
+        const tagIds: string[] = Array.isArray(narrative.required_tags) ? 
+          [...narrative.required_tags] : [];
+          
+        if (tagIds.length === 0) continue;
+        
         const { data: journalEntryTagsData, error: tagsError } = await supabase
           .from('journal_entry_tags')
           .select('journal_entry_id, tag_id')
-          // Explicitly type required_tags as string[] to help TypeScript
-          .in('tag_id', narrative.required_tags as string[])
+          .in('tag_id', tagIds)
           .eq('user_id', userId);
 
         if (tagsError) {
@@ -60,8 +65,7 @@ const Dashboard: React.FC = () => {
         const matchingEntryIds = Object.entries(entryCounts)
           .filter(([_, tags]) => {
             // Check if this entry has ALL the required tags
-            // Use null check before calling every method
-            return narrative.required_tags && narrative.required_tags.every(tagId => tags.includes(tagId));
+            return tagIds.every(tagId => tags.includes(tagId));
           })
           .map(([entryId]) => entryId);
 
