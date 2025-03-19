@@ -18,6 +18,7 @@ interface Event {
   end_date: string;
   primary_event: boolean;
   tags: string[];
+  hasJournal?: boolean;
 }
 
 const CalendarView = () => {
@@ -42,25 +43,44 @@ const CalendarView = () => {
 
         if (eventsError) {
           console.error('Error fetching events:', eventsError);
-        } else {
-          console.log('Raw events data:', eventsData);
-          // Transform events to match the calendar format
-          const transformedEvents = (eventsData || []).map(event => {
-            const transformed = {
-              id: event.id,
-              title: event.title,
-              start: new Date(event.start_date),
-              end: new Date(event.end_date),
-              color: event.primary_event ? 'pink' as const : 'blue' as const,
-            };
-            console.log('Transformed event:', transformed);
-            return transformed;
-          });
-          console.log('Final transformed events:', transformedEvents);
-          setEvents(transformedEvents);
+          return;
         }
+
+        // Fetch journal entries to check which events have them
+        const { data: journalEntries, error: journalError } = await supabase
+          .from('journal_entries')
+          .select('event_id')
+          .eq('user_id', user.id)
+          .not('event_id', 'is', null);
+
+        if (journalError) {
+          console.error('Error fetching journal entries:', journalError);
+          return;
+        }
+
+        // Create a Set of event IDs that have journal entries
+        const eventIdsWithJournal = new Set(journalEntries?.map(entry => entry.event_id) || []);
+
+        // Transform events to match the calendar format
+        const transformedEvents = (eventsData || []).map(event => {
+          const transformed = {
+            id: event.id,
+            title: event.title,
+            start: new Date(event.start_date),
+            end: new Date(event.end_date),
+            // Use a different style for events with journal entries
+            className: eventIdsWithJournal.has(event.id)
+              ? "bg-green-100 border-green-300"
+              : "bg-background border-border"
+          };
+          console.log('Transformed event:', transformed);
+          return transformed;
+        });
+
+        console.log('Final transformed events:', transformedEvents);
+        setEvents(transformedEvents);
       } catch (error) {
-        console.error('Error fetching events:', error);
+        console.error('Error:', error);
       } finally {
         setLoading(false);
       }
