@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +9,7 @@ import { ChevronLeft, BookOpen, Edit, Tag, Trash2 } from 'lucide-react';
 import CreateNarrativeDialog from '@/components/CreateNarrativeDialog';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { NarrativesContext } from '@/pages/Dashboard';
 
 interface Narrative {
     id: string;
@@ -36,6 +36,7 @@ const NarrativeShow: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { triggerNarrativesRefresh } = useContext(NarrativesContext);
     const [narrative, setNarrative] = useState<Narrative | null>(null);
     const [entries, setEntries] = useState<JournalEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -196,6 +197,9 @@ const NarrativeShow: React.FC = () => {
                 title: "Success",
                 description: "Narrative deleted successfully",
             });
+            
+            // Trigger a refresh of the sidebar
+            triggerNarrativesRefresh();
             
             // Navigate back to narratives page
             navigate('/dashboard/narratives');

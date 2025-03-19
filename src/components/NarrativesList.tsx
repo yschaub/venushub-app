@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, BookOpen, Edit, Trash2 } from 'lucide-react';
 import CreateNarrativeDialog from './CreateNarrativeDialog';
+import { NarrativesContext } from '@/pages/Dashboard';
 
 interface Narrative {
   id: string;
@@ -32,13 +32,13 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedNarrative, setSelectedNarrative] = useState<Narrative | null>(null);
   const { toast } = useToast();
+  const { triggerNarrativesRefresh } = useContext(NarrativesContext);
 
   const fetchNarratives = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) throw userError;
@@ -48,7 +48,6 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
         return;
       }
       
-      // Fetch narratives for this category
       const { data: narrativesData, error: narrativesError } = await supabase
         .from('narratives')
         .select('*')
@@ -58,7 +57,6 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
       
       if (narrativesError) throw narrativesError;
       
-      // Get the count of journal entries for each narrative
       const narrativesWithEntryCounts = await Promise.all(
         narrativesData.map(async (narrative) => {
           const { count, error: countError } = await supabase
@@ -112,7 +110,8 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
         description: "Narrative deleted successfully",
       });
       
-      // Refresh narratives list
+      triggerNarrativesRefresh();
+      
       fetchNarratives();
     } catch (error: any) {
       console.error('Error deleting narrative:', error);

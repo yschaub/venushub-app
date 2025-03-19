@@ -12,10 +12,22 @@ import Narratives from '@/pages/Narratives';
 import CalendarView from '@/pages/CalendarView';
 import NarrativeShow from '@/pages/NarrativeShow';
 
+// Create a context to share the refresh function
+export const NarrativesContext = React.createContext<{
+  triggerNarrativesRefresh: () => void;
+}>({
+  triggerNarrativesRefresh: () => {},
+});
+
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [refreshNarratives, setRefreshNarratives] = useState(0);
   const navigate = useNavigate();
+
+  const triggerNarrativesRefresh = () => {
+    setRefreshNarratives(prev => prev + 1);
+  };
 
   // Function to automatically associate journal entries with narratives based on tags
   const associateEntriesWithNarratives = async (userId: string) => {
@@ -145,26 +157,28 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <DashboardSidebar userEmail={userEmail} />
-        <SidebarInset>
-          <div className="flex h-full flex-col">
-            <div className="flex-grow overflow-auto">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/calendar" element={<CalendarView />} />
-                <Route path="/narratives" element={<Narratives />} />
-                <Route path="/narratives/:id" element={<NarrativeShow />} />
-                <Route path="/journal" element={<JournalEntries />} />
-                <Route path="/journal/create" element={<CreateJournalEntry />} />
-                <Route path="/journal/:id/edit" element={<EditJournalEntry />} />
-              </Routes>
+    <NarrativesContext.Provider value={{ triggerNarrativesRefresh }}>
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <DashboardSidebar userEmail={userEmail} refreshTrigger={refreshNarratives} />
+          <SidebarInset>
+            <div className="flex h-full flex-col">
+              <div className="flex-grow overflow-auto">
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/calendar" element={<CalendarView />} />
+                  <Route path="/narratives" element={<Narratives />} />
+                  <Route path="/narratives/:id" element={<NarrativeShow />} />
+                  <Route path="/journal" element={<JournalEntries />} />
+                  <Route path="/journal/create" element={<CreateJournalEntry />} />
+                  <Route path="/journal/:id/edit" element={<EditJournalEntry />} />
+                </Routes>
+              </div>
             </div>
-          </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    </NarrativesContext.Provider>
   );
 };
 
