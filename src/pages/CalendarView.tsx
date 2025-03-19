@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link, BookOpen } from 'lucide-react';
 import {
   Calendar,
   CalendarCurrentDate,
@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface Event {
   id: string;
@@ -30,6 +31,7 @@ interface Event {
   primary_event: boolean;
   tags: string[];
   hasJournal?: boolean;
+  journalId?: string;
 }
 
 interface RelatedEvent {
@@ -46,6 +48,17 @@ const CalendarView = () => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [relatedEvents, setRelatedEvents] = useState<RelatedEvent[]>([]);
   const [loadingRelatedEvents, setLoadingRelatedEvents] = useState(false);
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user?.id || null);
+    };
+    
+    fetchUserData();
+  }, []);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -71,7 +84,7 @@ const CalendarView = () => {
         // Fetch journal entries to check which events have them
         const { data: journalEntries, error: journalError } = await supabase
           .from('journal_entries')
-          .select('event_id')
+          .select('id, event_id')
           .eq('user_id', user.id)
           .not('event_id', 'is', null);
 
@@ -80,19 +93,27 @@ const CalendarView = () => {
           return;
         }
 
-        // Create a Set of event IDs that have journal entries
-        const eventIdsWithJournal = new Set(journalEntries?.map(entry => entry.event_id) || []);
+        // Create a Map of event IDs that have journal entries
+        const eventJournalMap = new Map();
+        journalEntries?.forEach(entry => {
+          eventJournalMap.set(entry.event_id, entry.id);
+        });
 
         // Transform events to match the calendar format
         const transformedEvents = (eventsData || []).map(event => {
+          const hasJournal = eventJournalMap.has(event.id);
+          const journalId = eventJournalMap.get(event.id);
+          
           const transformed = {
             id: event.id,
             title: event.title,
             start: new Date(event.start_date),
             end: new Date(event.end_date),
-            hasJournal: eventIdsWithJournal.has(event.id),
+            hasJournal: hasJournal,
+            journalId: journalId,
+            tags: event.tags,
             // Use a different style for events with journal entries
-            className: eventIdsWithJournal.has(event.id)
+            className: hasJournal
               ? "bg-green-100 border-green-300 cursor-pointer"
               : "bg-background border-border cursor-pointer"
           };
@@ -175,6 +196,30 @@ const CalendarView = () => {
     }
   };
 
+  const handleJournalAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!currentUser) {
+      navigate('/auth');
+      return;
+    }
+    
+    if (selectedEvent?.hasJournal && selectedEvent?.journalId) {
+      navigate(`/dashboard/journal/${selectedEvent.journalId}/edit`);
+    } else if (selectedEvent) {
+      navigate('/dashboard/journal/create', { 
+        state: { 
+          eventData: {
+            id: selectedEvent.id,
+            title: selectedEvent.title,
+            tags: selectedEvent.tags || [],
+            date: format(selectedEvent.start, 'yyyy-MM-dd')
+          } 
+        }
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -235,6 +280,21 @@ const CalendarView = () => {
               )}
             </SheetDescription>
           </SheetHeader>
+          
+          {/* Journal Entry Button */}
+          {selectedEvent && (
+            <div className="mt-4">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="flex items-center gap-1 w-full"
+                onClick={handleJournalAction}
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                {selectedEvent.hasJournal ? "View Journal" : "Journal About This"}
+              </Button>
+            </div>
+          )}
 
           {/* Related Events Section */}
           <div className="mt-6">
