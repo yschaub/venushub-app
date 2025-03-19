@@ -70,14 +70,15 @@ const NarrativeShow: React.FC = () => {
                     return;
                 }
 
-                setNarrative({
+                const narrative = {
                     ...narrativeData,
                     category_name: narrativeData.narrative_categories.name,
                     category_type: narrativeData.narrative_categories.type
-                });
+                };
+                setNarrative(narrative);
 
-                // Fetch journal entries for this narrative
-                const { data: entriesData, error: entriesError } = await supabase
+                // Fetch all entries that are already explicitly connected to this narrative
+                const { data: explicitEntries, error: explicitEntriesError } = await supabase
                     .from('narrative_journal_entries')
                     .select(`
                         journal_entries (
@@ -91,10 +92,10 @@ const NarrativeShow: React.FC = () => {
                     .eq('narrative_id', id)
                     .order('added_at', { ascending: false });
 
-                if (entriesError) throw entriesError;
-
-                // Transform the entries data
-                const transformedEntries = entriesData.map(entry => ({
+                if (explicitEntriesError) throw explicitEntriesError;
+                
+                // Transform the entries data for explicitly connected entries
+                const explicitTransformedEntries = explicitEntries.map(entry => ({
                     id: entry.journal_entries.id,
                     title: entry.journal_entries.title,
                     content: entry.journal_entries.content,
@@ -102,7 +103,55 @@ const NarrativeShow: React.FC = () => {
                     added_at: entry.added_at
                 }));
 
-                setEntries(transformedEntries);
+                // If narrative has required tags, fetch entries that match those tags
+                let tagBasedEntries: JournalEntry[] = [];
+                if (narrative.required_tags && narrative.required_tags.length > 0) {
+                    // Get all entries that have at least one of the required tags
+                    const { data: taggedEntriesData, error: taggedEntriesError } = await supabase
+                        .from('journal_entry_tags')
+                        .select(`
+                            journal_entry_id,
+                            journal_entries (
+                                id,
+                                title,
+                                content,
+                                date_created,
+                                user_id
+                            )
+                        `)
+                        .in('tag_id', narrative.required_tags)
+                        .eq('journal_entries.user_id', user.id);
+                    
+                    if (taggedEntriesError) throw taggedEntriesError;
+                    
+                    // Transform and filter for unique entries that aren't already in explicitEntries
+                    const explicitEntryIds = new Set(explicitTransformedEntries.map(e => e.id));
+                    
+                    // Create a map to prevent duplicates from tag-based entries
+                    const uniqueTagEntries = new Map();
+                    
+                    taggedEntriesData.forEach(item => {
+                        const entry = item.journal_entries;
+                        // Only add if not already included in explicit entries
+                        if (entry && !explicitEntryIds.has(entry.id) && !uniqueTagEntries.has(entry.id)) {
+                            uniqueTagEntries.set(entry.id, {
+                                id: entry.id,
+                                title: entry.title,
+                                content: entry.content,
+                                date_created: entry.date_created,
+                                added_at: new Date().toISOString() // Use current date as these weren't explicitly added
+                            });
+                        }
+                    });
+                    
+                    tagBasedEntries = Array.from(uniqueTagEntries.values());
+                }
+                
+                // Combine both types of entries and sort by added_at
+                const allEntries = [...explicitTransformedEntries, ...tagBasedEntries]
+                    .sort((a, b) => new Date(b.added_at).getTime() - new Date(a.added_at).getTime());
+                
+                setEntries(allEntries);
             } catch (error: any) {
                 console.error('Error fetching narrative and entries:', error);
                 setError(error.message || "Failed to load narrative");
@@ -194,6 +243,11 @@ const NarrativeShow: React.FC = () => {
                 <p className="text-muted-foreground">
                     Category: {narrative.category_name}
                 </p>
+                {narrative.required_tags && narrative.required_tags.length > 0 && (
+                    <p className="text-muted-foreground text-sm mt-1">
+                        This narrative automatically includes entries with required tags
+                    </p>
+                )}
             </div>
 
             <h3 className="text-lg font-medium mb-4">Journal Entries</h3>
@@ -204,7 +258,7 @@ const NarrativeShow: React.FC = () => {
                         <p>No journal entries in this narrative yet.</p>
                         {narrative.required_tags && narrative.required_tags.length > 0 && (
                             <p className="text-sm text-muted-foreground mt-2">
-                                Journal entries with the required tags will be automatically added to this narrative.
+                                Journal entries with the required tags will be shown here.
                             </p>
                         )}
                     </CardContent>
@@ -212,14 +266,24 @@ const NarrativeShow: React.FC = () => {
             ) : (
                 <div className="space-y-4">
                     {entries.map((entry) => (
-                        <Card key={entry.id}>
+                        <Card key={entry.id} className="hover:shadow-md transition-shadow">
                             <CardHeader>
                                 <CardTitle className="text-base">{entry.title}</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex items-center text-muted-foreground text-sm">
-                                    <BookOpen className="h-4 w-4 mr-1" />
-                                    <span>Added on {format(new Date(entry.added_at), 'PPP')}</span>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center text-muted-foreground text-sm">
+                                        <BookOpen className="h-4 w-4 mr-1" />
+                                        <span>Created on {format(new Date(entry.date_created), 'PPP')}</span>
+                                    </div>
+                                    <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-0 h-auto"
+                                        onClick={() => navigate(`/dashboard/journal/${entry.id}`)}
+                                    >
+                                        View entry
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
