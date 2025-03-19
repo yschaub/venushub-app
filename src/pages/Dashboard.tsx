@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Routes, Route } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,18 +33,15 @@ const Dashboard: React.FC = () => {
         if (!narrative.required_tags || narrative.required_tags.length === 0) continue;
 
         // Find journal entries that have ALL the required tags for this narrative
-        // First, get the journal entries with ANY of the required tags
-        // Fix: Cast required_tags as a string[] array and use type assertion to avoid deep instantiation
-        const tagIds: string[] = Array.isArray(narrative.required_tags) ? 
-          [...narrative.required_tags] : [];
-          
-        if (tagIds.length === 0) continue;
+        // Convert required_tags to a simple string[] to avoid TypeScript recursion
+        const requiredTags = narrative.required_tags as unknown as string[];
+        
+        if (!requiredTags.length) continue;
         
         const { data: journalEntryTagsData, error: tagsError } = await supabase
           .from('journal_entry_tags')
           .select('journal_entry_id, tag_id')
-          .in('tag_id', tagIds)
-          .eq('user_id', userId);
+          .in('tag_id', requiredTags);
 
         if (tagsError) {
           console.error('Error fetching journal entry tags:', tagsError);
@@ -65,7 +61,7 @@ const Dashboard: React.FC = () => {
         const matchingEntryIds = Object.entries(entryCounts)
           .filter(([_, tags]) => {
             // Check if this entry has ALL the required tags
-            return tagIds.every(tagId => tags.includes(tagId));
+            return requiredTags.every(tagId => tags.includes(tagId));
           })
           .map(([entryId]) => entryId);
 
