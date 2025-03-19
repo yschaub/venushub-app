@@ -6,8 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { ChevronLeft, BookOpen, Edit } from 'lucide-react';
+import { ChevronLeft, BookOpen, Edit, Tag } from 'lucide-react';
 import CreateNarrativeDialog from '@/components/CreateNarrativeDialog';
+import { Badge } from '@/components/ui/badge';
 
 interface Narrative {
     id: string;
@@ -16,6 +17,11 @@ interface Narrative {
     category_name: string;
     category_type: string;
     required_tags?: string[];
+}
+
+interface Tag {
+    id: string;
+    name: string;
 }
 
 interface JournalEntry {
@@ -34,6 +40,7 @@ const NarrativeShow: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [narrativeTags, setNarrativeTags] = useState<Tag[]>([]);
 
     useEffect(() => {
         const fetchNarrativeAndEntries = async () => {
@@ -76,9 +83,17 @@ const NarrativeShow: React.FC = () => {
                 };
                 setNarrative(narrative);
 
-                // If narrative has required tags, fetch entries that match those tags
-                let tagBasedEntries: JournalEntry[] = [];
+                // If narrative has required tags, fetch tag names and entries that match those tags
                 if (narrative.required_tags && narrative.required_tags.length > 0) {
+                    // Fetch tag names
+                    const { data: tagData, error: tagError } = await supabase
+                        .from('system_tags')
+                        .select('id, name')
+                        .in('id', narrative.required_tags);
+                    
+                    if (tagError) throw tagError;
+                    setNarrativeTags(tagData || []);
+                    
                     // Get all entries that have at least one of the required tags
                     const { data: taggedEntriesData, error: taggedEntriesError } = await supabase
                         .from('journal_entry_tags')
@@ -113,14 +128,14 @@ const NarrativeShow: React.FC = () => {
                         }
                     });
                     
-                    tagBasedEntries = Array.from(uniqueTagEntries.values());
+                    // Sort entries by date_created
+                    const sortedEntries = Array.from(uniqueTagEntries.values())
+                        .sort((a, b) => new Date(b.date_created).getTime() - new Date(a.date_created).getTime());
+                    
+                    setEntries(sortedEntries);
+                } else {
+                    setEntries([]);
                 }
-                
-                // Sort entries by date_created
-                const sortedEntries = tagBasedEntries
-                    .sort((a, b) => new Date(b.date_created).getTime() - new Date(a.date_created).getTime());
-                
-                setEntries(sortedEntries);
             } catch (error: any) {
                 console.error('Error fetching narrative and entries:', error);
                 setError(error.message || "Failed to load narrative");
@@ -212,10 +227,21 @@ const NarrativeShow: React.FC = () => {
                 <p className="text-muted-foreground">
                     Category: {narrative.category_name}
                 </p>
-                {narrative.required_tags && narrative.required_tags.length > 0 && (
-                    <p className="text-muted-foreground text-sm mt-1">
-                        This narrative automatically includes entries with required tags
-                    </p>
+                
+                {narrativeTags.length > 0 && (
+                    <div className="mt-3">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+                            <Tag className="h-3 w-3" />
+                            <span>Tags:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {narrativeTags.map(tag => (
+                                <Badge key={tag.id} variant="secondary">
+                                    {tag.name}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
                 )}
             </div>
 
@@ -227,7 +253,7 @@ const NarrativeShow: React.FC = () => {
                         <p>No journal entries in this narrative yet.</p>
                         {narrative.required_tags && narrative.required_tags.length > 0 && (
                             <p className="text-sm text-muted-foreground mt-2">
-                                Journal entries with the required tags will be shown here.
+                                Journal entries with matching tags will appear here automatically.
                             </p>
                         )}
                     </CardContent>
