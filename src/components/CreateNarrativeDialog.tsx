@@ -107,7 +107,7 @@ const CreateNarrativeDialog = ({
       if (userError) throw userError;
       if (!user) return;
       
-      // Count journal entries with ALL of the selected tags
+      // This query was causing the TypeScript error - let's fix it
       const { count, error } = await supabase
         .from('journal_entry_tags')
         .select('journal_entry_id', { count: 'exact', head: true })
