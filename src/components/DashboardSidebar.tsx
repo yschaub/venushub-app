@@ -20,7 +20,6 @@ import CreateNarrativeDialog from './CreateNarrativeDialog';
 
 interface DashboardSidebarProps {
   userEmail: string | null;
-  refreshTrigger?: number;
 }
 
 interface NarrativeCategory {
@@ -35,7 +34,7 @@ interface Narrative {
   category_id: string;
 }
 
-const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail, refreshTrigger = 0 }) => {
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<NarrativeCategory[]>([]);
   const [narratives, setNarratives] = useState<Narrative[]>([]);
@@ -108,12 +107,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail, refreshT
 
     fetchCategoriesAndNarratives();
   }, []);
-
-  useEffect(() => {
-    if (refreshTrigger > 0) {
-      fetchNarratives();
-    }
-  }, [refreshTrigger]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev => ({
