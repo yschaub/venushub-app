@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -5,8 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { ChevronLeft, BookOpen, Pencil } from 'lucide-react';
-import AddJournalEntriesDialog from '@/components/AddJournalEntriesDialog';
+import { ChevronLeft, BookOpen, Edit } from 'lucide-react';
+import CreateNarrativeDialog from '@/components/CreateNarrativeDialog';
 
 interface Narrative {
     id: string;
@@ -14,6 +15,7 @@ interface Narrative {
     category_id: string;
     category_name: string;
     category_type: string;
+    required_tags?: string[];
 }
 
 interface JournalEntry {
@@ -32,7 +34,7 @@ const NarrativeShow: React.FC = () => {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [addEntriesDialogOpen, setAddEntriesDialogOpen] = useState(false);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
 
     useEffect(() => {
         const fetchNarrativeAndEntries = async () => {
@@ -52,12 +54,12 @@ const NarrativeShow: React.FC = () => {
                 const { data: narrativeData, error: narrativeError } = await supabase
                     .from('narratives')
                     .select(`
-            *,
-            narrative_categories (
-              name,
-              type
-            )
-          `)
+                        *,
+                        narrative_categories (
+                            name,
+                            type
+                        )
+                    `)
                     .eq('id', id)
                     .eq('user_id', user.id)
                     .single();
@@ -78,14 +80,14 @@ const NarrativeShow: React.FC = () => {
                 const { data: entriesData, error: entriesError } = await supabase
                     .from('narrative_journal_entries')
                     .select(`
-            journal_entries (
-              id,
-              title,
-              content,
-              date_created
-            ),
-            added_at
-          `)
+                        journal_entries (
+                            id,
+                            title,
+                            content,
+                            date_created
+                        ),
+                        added_at
+                    `)
                     .eq('narrative_id', id)
                     .order('added_at', { ascending: false });
 
@@ -117,7 +119,7 @@ const NarrativeShow: React.FC = () => {
         if (id) {
             fetchNarrativeAndEntries();
         }
-    }, [id, toast]);
+    }, [id, toast, editDialogOpen]);
 
     const getCategoryIcon = (type: string) => {
         switch (type) {
@@ -174,32 +176,37 @@ const NarrativeShow: React.FC = () => {
                     <ChevronLeft className="h-4 w-4 mr-2" />
                     Back to Narratives
                 </Button>
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">{getCategoryIcon(narrative.category_type)}</span>
-                    <h2 className="text-2xl font-semibold">{narrative.title}</h2>
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-2xl">{getCategoryIcon(narrative.category_type)}</span>
+                        <h2 className="text-2xl font-semibold">{narrative.title}</h2>
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditDialogOpen(true)}
+                        className="flex items-center gap-1"
+                    >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                    </Button>
                 </div>
                 <p className="text-muted-foreground">
                     Category: {narrative.category_name}
                 </p>
             </div>
 
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Journal Entries</h3>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setAddEntriesDialogOpen(true)}
-                    className="flex items-center gap-1"
-                >
-                    <Pencil className="h-4 w-4" />
-                    Add Entries
-                </Button>
-            </div>
+            <h3 className="text-lg font-medium mb-4">Journal Entries</h3>
 
             {entries.length === 0 ? (
                 <Card className="bg-muted/50">
                     <CardContent className="py-10 text-center">
                         <p>No journal entries in this narrative yet.</p>
+                        {narrative.required_tags && narrative.required_tags.length > 0 && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                                Journal entries with the required tags will be automatically added to this narrative.
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             ) : (
@@ -220,50 +227,20 @@ const NarrativeShow: React.FC = () => {
                 </div>
             )}
 
-            <AddJournalEntriesDialog
-                open={addEntriesDialogOpen}
-                onOpenChange={setAddEntriesDialogOpen}
-                narrativeId={narrative.id}
-                narrative={narrative.title}
-                onEntriesAdded={() => {
-                    // Refresh the entries list
-                    const fetchEntries = async () => {
-                        try {
-                            const { data: entriesData, error: entriesError } = await supabase
-                                .from('narrative_journal_entries')
-                                .select(`
-                  journal_entries (
-                    id,
-                    title,
-                    content,
-                    date_created
-                  ),
-                  added_at
-                `)
-                                .eq('narrative_id', narrative.id)
-                                .order('added_at', { ascending: false });
-
-                            if (entriesError) throw entriesError;
-
-                            const transformedEntries = entriesData.map(entry => ({
-                                id: entry.journal_entries.id,
-                                title: entry.journal_entries.title,
-                                content: entry.journal_entries.content,
-                                date_created: entry.journal_entries.date_created,
-                                added_at: entry.added_at
-                            }));
-
-                            setEntries(transformedEntries);
-                        } catch (error) {
-                            console.error('Error refreshing entries:', error);
-                        }
-                    };
-
-                    fetchEntries();
+            <CreateNarrativeDialog
+                open={editDialogOpen}
+                onOpenChange={setEditDialogOpen}
+                categoryId={narrative.category_id}
+                categoryName={narrative.category_name}
+                narrativeToEdit={{
+                    id: narrative.id,
+                    title: narrative.title,
+                    required_tags: narrative.required_tags
                 }}
+                onNarrativeCreated={() => {}}
             />
         </div>
     );
 };
 
-export default NarrativeShow; 
+export default NarrativeShow;

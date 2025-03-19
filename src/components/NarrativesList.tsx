@@ -1,12 +1,12 @@
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, BookOpen, Pencil } from 'lucide-react';
+import { PlusCircle, BookOpen, Edit } from 'lucide-react';
 import CreateNarrativeDialog from './CreateNarrativeDialog';
-import AddJournalEntriesDialog from './AddJournalEntriesDialog';
 
 interface Narrative {
   id: string;
@@ -14,6 +14,7 @@ interface Narrative {
   content: string | null;
   created_at: string;
   updated_at: string;
+  required_tags?: string[];
   entry_count?: number;
 }
 
@@ -23,12 +24,13 @@ interface NarrativesListProps {
 }
 
 const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
+  const navigate = useNavigate();
   const [narratives, setNarratives] = useState<Narrative[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedNarrativeId, setSelectedNarrativeId] = useState<string | null>(null);
-  const [addEntriesDialogOpen, setAddEntriesDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedNarrative, setSelectedNarrative] = useState<Narrative | null>(null);
   const { toast } = useToast();
 
   const fetchNarratives = async () => {
@@ -91,6 +93,11 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
     fetchNarratives();
   }, [categoryId]);
 
+  const handleEditNarrative = (narrative: Narrative) => {
+    setSelectedNarrative(narrative);
+    setEditDialogOpen(true);
+  };
+
   if (isLoading) {
     return <div className="py-4 text-center">Loading narratives...</div>;
   }
@@ -139,20 +146,27 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
-                      setSelectedNarrativeId(narrative.id);
-                      setAddEntriesDialogOpen(true);
-                    }}
-                    title="Add journal entries"
+                    onClick={() => handleEditNarrative(narrative)}
+                    title="Edit narrative"
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Edit className="h-4 w-4" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center text-muted-foreground text-sm">
-                  <BookOpen className="h-4 w-4 mr-1" />
-                  <span>{narrative.entry_count} journal entries</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center text-muted-foreground text-sm">
+                    <BookOpen className="h-4 w-4 mr-1" />
+                    <span>{narrative.entry_count} journal entries</span>
+                  </div>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0 h-auto"
+                    onClick={() => navigate(`/dashboard/narratives/${narrative.id}`)}
+                  >
+                    View
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -168,15 +182,14 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
         onNarrativeCreated={fetchNarratives}
       />
       
-      {selectedNarrativeId && (
-        <AddJournalEntriesDialog
-          open={addEntriesDialogOpen}
-          onOpenChange={setAddEntriesDialogOpen}
-          narrativeId={selectedNarrativeId}
-          narrative={narratives.find(n => n.id === selectedNarrativeId)?.title || ''}
-          onEntriesAdded={fetchNarratives}
-        />
-      )}
+      <CreateNarrativeDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        categoryId={categoryId}
+        categoryName={categoryName}
+        narrativeToEdit={selectedNarrative}
+        onNarrativeCreated={fetchNarratives}
+      />
     </div>
   );
 };

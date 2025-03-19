@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Routes, Route } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +17,92 @@ const Dashboard: React.FC = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // Function to automatically associate journal entries with narratives based on tags
+  const associateEntriesWithNarratives = async (userId: string) => {
+    try {
+      // Fetch all narratives with required tags
+      const { data: narratives, error: narrativesError } = await supabase
+        .from('narratives')
+        .select('id, required_tags')
+        .eq('user_id', userId)
+        .not('required_tags', 'eq', '{}');
+
+      if (narrativesError) throw narrativesError;
+      if (!narratives || narratives.length === 0) return;
+
+      for (const narrative of narratives) {
+        if (!narrative.required_tags || narrative.required_tags.length === 0) continue;
+
+        // Find journal entries that have ALL the required tags for this narrative
+        // First, get the journal entries with ANY of the required tags
+        const { data: journalEntryTagsData, error: tagsError } = await supabase
+          .from('journal_entry_tags')
+          .select('journal_entry_id, tag_id')
+          .in('tag_id', narrative.required_tags)
+          .eq('user_id', userId);
+
+        if (tagsError) {
+          console.error('Error fetching journal entry tags:', tagsError);
+          continue;
+        }
+
+        // Group entries by journal_entry_id and count how many tags they have
+        const entryCounts: Record<string, string[]> = {};
+        journalEntryTagsData.forEach(item => {
+          if (!entryCounts[item.journal_entry_id]) {
+            entryCounts[item.journal_entry_id] = [];
+          }
+          entryCounts[item.journal_entry_id].push(item.tag_id);
+        });
+
+        // Find entries that have ALL required tags
+        const matchingEntryIds = Object.entries(entryCounts)
+          .filter(([_, tags]) => {
+            // Check if this entry has ALL the required tags
+            return narrative.required_tags.every(tagId => tags.includes(tagId));
+          })
+          .map(([entryId]) => entryId);
+
+        if (matchingEntryIds.length === 0) continue;
+
+        // Find which entries are already associated with this narrative
+        const { data: existingAssociations, error: existingError } = await supabase
+          .from('narrative_journal_entries')
+          .select('journal_entry_id')
+          .eq('narrative_id', narrative.id)
+          .in('journal_entry_id', matchingEntryIds);
+
+        if (existingError) {
+          console.error('Error fetching existing associations:', existingError);
+          continue;
+        }
+
+        const existingEntryIds = existingAssociations.map(item => item.journal_entry_id);
+        
+        // Find entries that need to be added
+        const entriesToAdd = matchingEntryIds.filter(id => !existingEntryIds.includes(id));
+        
+        if (entriesToAdd.length === 0) continue;
+
+        // Add new associations
+        const associationsToInsert = entriesToAdd.map(entryId => ({
+          narrative_id: narrative.id,
+          journal_entry_id: entryId
+        }));
+
+        const { error: insertError } = await supabase
+          .from('narrative_journal_entries')
+          .insert(associationsToInsert);
+
+        if (insertError) {
+          console.error('Error associating entries with narrative:', insertError);
+        }
+      }
+    } catch (error) {
+      console.error('Error in associateEntriesWithNarratives:', error);
+    }
+  };
+
   useEffect(() => {
     const getUser = async () => {
       const {
@@ -28,6 +115,10 @@ const Dashboard: React.FC = () => {
         return;
       }
       setUserEmail(user.email);
+      
+      // Associate journal entries with narratives based on tags
+      await associateEntriesWithNarratives(user.id);
+      
       setLoading(false);
     };
     getUser();
