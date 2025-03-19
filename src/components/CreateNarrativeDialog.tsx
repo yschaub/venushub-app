@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -52,7 +51,6 @@ const CreateNarrativeDialog = ({
 
   useEffect(() => {
     if (open) {
-      // Reset form when dialog opens
       if (narrativeToEdit) {
         setTitle(narrativeToEdit.title);
         setSelectedTags(narrativeToEdit.required_tags || []);
@@ -102,17 +100,14 @@ const CreateNarrativeDialog = ({
     try {
       setIsLoadingCount(true);
       
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) return;
       
-      // This query was causing the TypeScript error - let's fix it
       const { count, error } = await supabase
         .from('journal_entry_tags')
         .select('journal_entry_id', { count: 'exact', head: true })
-        .in('tag_id', selectedTags)
-        .eq('user_id', user.id);
+        .in('tag_id', selectedTags);
       
       if (error) throw error;
       
@@ -150,7 +145,6 @@ const CreateNarrativeDialog = ({
     try {
       setIsSubmitting(true);
       
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) throw userError;
@@ -160,7 +154,6 @@ const CreateNarrativeDialog = ({
       }
       
       if (narrativeToEdit) {
-        // Update existing narrative
         const { error } = await supabase
           .from('narratives')
           .update({
@@ -177,7 +170,6 @@ const CreateNarrativeDialog = ({
           description: "Narrative updated successfully"
         });
       } else {
-        // Create new narrative
         const { data, error } = await supabase
           .from('narratives')
           .insert({
@@ -197,12 +189,10 @@ const CreateNarrativeDialog = ({
         });
       }
       
-      // Reset form and close dialog
       setTitle('');
       setSelectedTags([]);
       onOpenChange(false);
       
-      // Notify parent component
       onNarrativeCreated();
       
     } catch (error: any) {
