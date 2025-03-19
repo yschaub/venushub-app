@@ -83,7 +83,7 @@ const NarrativeShow: React.FC = () => {
                 };
                 setNarrative(narrative);
 
-                // If narrative has required tags, fetch tag names and entries that match those tags
+                // If narrative has required tags, fetch tag names and entries that match ALL those tags
                 if (narrative.required_tags && narrative.required_tags.length > 0) {
                     // Fetch tag names
                     const { data: tagData, error: tagError } = await supabase
@@ -94,42 +94,51 @@ const NarrativeShow: React.FC = () => {
                     if (tagError) throw tagError;
                     setNarrativeTags(tagData || []);
                     
-                    // Get all entries that have at least one of the required tags
-                    const { data: taggedEntriesData, error: taggedEntriesError } = await supabase
+                    // First, get all journal entries for this user
+                    const { data: userEntriesData, error: userEntriesError } = await supabase
+                        .from('journal_entries')
+                        .select('id, title, content, date_created')
+                        .eq('user_id', user.id);
+                    
+                    if (userEntriesError) throw userEntriesError;
+                    
+                    if (!userEntriesData || userEntriesData.length === 0) {
+                        setEntries([]);
+                        setIsLoading(false);
+                        return;
+                    }
+                    
+                    // Get tags for all of the user's entries
+                    const { data: entryTagsData, error: entryTagsError } = await supabase
                         .from('journal_entry_tags')
-                        .select(`
-                            journal_entry_id,
-                            journal_entries (
-                                id,
-                                title,
-                                content,
-                                date_created,
-                                user_id
-                            )
-                        `)
-                        .in('tag_id', narrative.required_tags)
-                        .eq('journal_entries.user_id', user.id);
+                        .select('journal_entry_id, tag_id')
+                        .in('journal_entry_id', userEntriesData.map(entry => entry.id));
                     
-                    if (taggedEntriesError) throw taggedEntriesError;
+                    if (entryTagsError) throw entryTagsError;
                     
-                    // Create a map to prevent duplicates from tag-based entries
-                    const uniqueTagEntries = new Map();
+                    // Group tags by entry id
+                    const entryTagsMap = new Map<string, Set<string>>();
                     
-                    taggedEntriesData.forEach(item => {
-                        const entry = item.journal_entries;
-                        // Only add if not already included
-                        if (entry && !uniqueTagEntries.has(entry.id)) {
-                            uniqueTagEntries.set(entry.id, {
-                                id: entry.id,
-                                title: entry.title,
-                                content: entry.content,
-                                date_created: entry.date_created
-                            });
-                        }
+                    if (entryTagsData) {
+                        entryTagsData.forEach(item => {
+                            if (!entryTagsMap.has(item.journal_entry_id)) {
+                                entryTagsMap.set(item.journal_entry_id, new Set());
+                            }
+                            entryTagsMap.get(item.journal_entry_id)?.add(item.tag_id);
+                        });
+                    }
+                    
+                    // Filter entries that have ALL the required tags (AND logic)
+                    const matchingEntries = userEntriesData.filter(entry => {
+                        const entryTags = entryTagsMap.get(entry.id);
+                        if (!entryTags) return false;
+                        
+                        // Check if entry has ALL required tags
+                        return narrative.required_tags!.every(tagId => entryTags.has(tagId));
                     });
                     
                     // Sort entries by date_created
-                    const sortedEntries = Array.from(uniqueTagEntries.values())
+                    const sortedEntries = matchingEntries
                         .sort((a, b) => new Date(b.date_created).getTime() - new Date(a.date_created).getTime());
                     
                     setEntries(sortedEntries);
@@ -253,7 +262,7 @@ const NarrativeShow: React.FC = () => {
                         <p>No journal entries in this narrative yet.</p>
                         {narrative.required_tags && narrative.required_tags.length > 0 && (
                             <p className="text-sm text-muted-foreground mt-2">
-                                Journal entries with matching tags will appear here automatically.
+                                Journal entries with ALL matching tags will appear here automatically.
                             </p>
                         )}
                     </CardContent>
