@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -104,14 +105,53 @@ const CreateNarrativeDialog = ({
       if (userError) throw userError;
       if (!user) return;
       
-      const { count, error } = await supabase
+      // First, get all journal entries for this user
+      const { data: userEntriesData, error: userEntriesError } = await supabase
+        .from('journal_entries')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      if (userEntriesError) throw userEntriesError;
+      
+      if (!userEntriesData || userEntriesData.length === 0) {
+        setMatchingEntriesCount(0);
+        setIsLoadingCount(false);
+        return;
+      }
+      
+      // Get tags for all of the user's entries
+      const { data: entryTagsData, error: entryTagsError } = await supabase
         .from('journal_entry_tags')
-        .select('journal_entry_id', { count: 'exact', head: true })
-        .in('tag_id', selectedTags);
+        .select('journal_entry_id, tag_id')
+        .in('journal_entry_id', userEntriesData.map(entry => entry.id));
       
-      if (error) throw error;
+      if (entryTagsError) throw entryTagsError;
       
-      setMatchingEntriesCount(count || 0);
+      // Group tags by entry id
+      const entryTagsMap = new Map<string, Set<string>>();
+      
+      if (entryTagsData) {
+        entryTagsData.forEach(item => {
+          if (!entryTagsMap.has(item.journal_entry_id)) {
+            entryTagsMap.set(item.journal_entry_id, new Set());
+          }
+          entryTagsMap.get(item.journal_entry_id)?.add(item.tag_id);
+        });
+      }
+      
+      // Count entries that have ALL the required tags (AND logic)
+      let matchCount = 0;
+      userEntriesData.forEach(entry => {
+        const entryTags = entryTagsMap.get(entry.id);
+        if (!entryTags) return;
+        
+        // Check if entry has ALL required tags
+        if (selectedTags.every(tagId => entryTags.has(tagId))) {
+          matchCount++;
+        }
+      });
+      
+      setMatchingEntriesCount(matchCount);
     } catch (error: any) {
       console.error('Error counting matching entries:', error);
       setMatchingEntriesCount(null);
@@ -239,7 +279,7 @@ const CreateNarrativeDialog = ({
                 Required Tags (optional)
               </label>
               <p className="text-xs text-muted-foreground mb-2">
-                Journal entries with these tags will be automatically added to this narrative.
+                Journal entries with ALL these tags will be automatically added to this narrative.
               </p>
               
               <div className="flex flex-wrap gap-2 mb-2">
@@ -284,7 +324,7 @@ const CreateNarrativeDialog = ({
                   ) : (
                     <span>
                       {matchingEntriesCount !== null 
-                        ? `${matchingEntriesCount} journal entries match these tags`
+                        ? `${matchingEntriesCount} journal ${matchingEntriesCount === 1 ? 'entry matches' : 'entries match'} ALL these tags`
                         : 'No matching journal entries found'}
                     </span>
                   )}
