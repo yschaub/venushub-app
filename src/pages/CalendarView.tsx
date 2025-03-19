@@ -10,6 +10,14 @@ import {
   CalendarTodayTrigger,
   CalendarEvent,
 } from '@/components/ui/full-calendar';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { format } from 'date-fns';
 
 interface Event {
   id: string;
@@ -24,6 +32,8 @@ interface Event {
 const CalendarView = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -68,10 +78,11 @@ const CalendarView = () => {
             title: event.title,
             start: new Date(event.start_date),
             end: new Date(event.end_date),
+            hasJournal: eventIdsWithJournal.has(event.id),
             // Use a different style for events with journal entries
             className: eventIdsWithJournal.has(event.id)
-              ? "bg-green-100 border-green-300"
-              : "bg-background border-border"
+              ? "bg-green-100 border-green-300 cursor-pointer"
+              : "bg-background border-border cursor-pointer"
           };
           console.log('Transformed event:', transformed);
           return transformed;
@@ -89,6 +100,11 @@ const CalendarView = () => {
     fetchEvents();
   }, []);
 
+  const handleEventClick = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setIsSheetOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -97,34 +113,61 @@ const CalendarView = () => {
     );
   }
 
-  console.log('Rendering calendar with events:', events);
-
   return (
-    <Calendar events={events} view="month">
-      <div className="h-dvh py-6 flex flex-col">
-        <div className="flex px-6 items-center gap-2 mb-6">
-          <span className="flex-1" />
+    <>
+      <Calendar
+        events={events}
+        view="month"
+        onEventClick={handleEventClick}
+      >
+        <div className="h-dvh py-6 flex flex-col">
+          <div className="flex px-6 items-center gap-2 mb-6">
+            <span className="flex-1" />
 
-          <CalendarCurrentDate />
+            <CalendarCurrentDate />
 
-          <CalendarPrevTrigger>
-            <ChevronLeft size={20} />
-            <span className="sr-only">Previous</span>
-          </CalendarPrevTrigger>
+            <CalendarPrevTrigger>
+              <ChevronLeft size={20} />
+              <span className="sr-only">Previous</span>
+            </CalendarPrevTrigger>
 
-          <CalendarTodayTrigger>Today</CalendarTodayTrigger>
+            <CalendarTodayTrigger>Today</CalendarTodayTrigger>
 
-          <CalendarNextTrigger>
-            <ChevronRight size={20} />
-            <span className="sr-only">Next</span>
-          </CalendarNextTrigger>
+            <CalendarNextTrigger>
+              <ChevronRight size={20} />
+              <span className="sr-only">Next</span>
+            </CalendarNextTrigger>
+          </div>
+
+          <div className="flex-1 overflow-auto px-6 relative">
+            <CalendarMonthView />
+          </div>
         </div>
+      </Calendar>
 
-        <div className="flex-1 overflow-auto px-6 relative">
-          <CalendarMonthView />
-        </div>
-      </div>
-    </Calendar>
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{selectedEvent?.title}</SheetTitle>
+            <SheetDescription className="space-y-3">
+              {selectedEvent && (
+                <>
+                  <p>
+                    <strong>Start:</strong> {format(selectedEvent.start, 'PPP')}
+                  </p>
+                  <p>
+                    <strong>End:</strong> {format(selectedEvent.end, 'PPP')}
+                  </p>
+                  <p>
+                    <strong>Status:</strong> {selectedEvent.hasJournal ? 'Journal entry added' : 'No journal entry'}
+                  </p>
+                </>
+              )}
+            </SheetDescription>
+          </SheetHeader>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 };
 
