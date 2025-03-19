@@ -23,7 +23,6 @@ interface JournalEntry {
     title: string;
     content: string | null;
     date_created: string;
-    added_at: string;
 }
 
 const NarrativeShow: React.FC = () => {
@@ -77,32 +76,6 @@ const NarrativeShow: React.FC = () => {
                 };
                 setNarrative(narrative);
 
-                // Fetch all entries that are already explicitly connected to this narrative
-                const { data: explicitEntries, error: explicitEntriesError } = await supabase
-                    .from('narrative_journal_entries')
-                    .select(`
-                        journal_entries (
-                            id,
-                            title,
-                            content,
-                            date_created
-                        ),
-                        added_at
-                    `)
-                    .eq('narrative_id', id)
-                    .order('added_at', { ascending: false });
-
-                if (explicitEntriesError) throw explicitEntriesError;
-                
-                // Transform the entries data for explicitly connected entries
-                const explicitTransformedEntries = explicitEntries.map(entry => ({
-                    id: entry.journal_entries.id,
-                    title: entry.journal_entries.title,
-                    content: entry.journal_entries.content,
-                    date_created: entry.journal_entries.date_created,
-                    added_at: entry.added_at
-                }));
-
                 // If narrative has required tags, fetch entries that match those tags
                 let tagBasedEntries: JournalEntry[] = [];
                 if (narrative.required_tags && narrative.required_tags.length > 0) {
@@ -124,22 +97,18 @@ const NarrativeShow: React.FC = () => {
                     
                     if (taggedEntriesError) throw taggedEntriesError;
                     
-                    // Transform and filter for unique entries that aren't already in explicitEntries
-                    const explicitEntryIds = new Set(explicitTransformedEntries.map(e => e.id));
-                    
                     // Create a map to prevent duplicates from tag-based entries
                     const uniqueTagEntries = new Map();
                     
                     taggedEntriesData.forEach(item => {
                         const entry = item.journal_entries;
-                        // Only add if not already included in explicit entries
-                        if (entry && !explicitEntryIds.has(entry.id) && !uniqueTagEntries.has(entry.id)) {
+                        // Only add if not already included
+                        if (entry && !uniqueTagEntries.has(entry.id)) {
                             uniqueTagEntries.set(entry.id, {
                                 id: entry.id,
                                 title: entry.title,
                                 content: entry.content,
-                                date_created: entry.date_created,
-                                added_at: new Date().toISOString() // Use current date as these weren't explicitly added
+                                date_created: entry.date_created
                             });
                         }
                     });
@@ -147,11 +116,11 @@ const NarrativeShow: React.FC = () => {
                     tagBasedEntries = Array.from(uniqueTagEntries.values());
                 }
                 
-                // Combine both types of entries and sort by added_at
-                const allEntries = [...explicitTransformedEntries, ...tagBasedEntries]
-                    .sort((a, b) => new Date(b.added_at).getTime() - new Date(a.added_at).getTime());
+                // Sort entries by date_created
+                const sortedEntries = tagBasedEntries
+                    .sort((a, b) => new Date(b.date_created).getTime() - new Date(a.date_created).getTime());
                 
-                setEntries(allEntries);
+                setEntries(sortedEntries);
             } catch (error: any) {
                 console.error('Error fetching narrative and entries:', error);
                 setError(error.message || "Failed to load narrative");
