@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Routes, Route } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,12 +9,13 @@ import CreateJournalEntry from '@/pages/CreateJournalEntry';
 import EditJournalEntry from '@/pages/EditJournalEntry';
 import Narratives from '@/pages/Narratives';
 import CalendarView from '@/pages/CalendarView';
+import NarrativeShow from '@/pages/NarrativeShow';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     const getUser = async () => {
       const {
@@ -31,7 +31,7 @@ const Dashboard: React.FC = () => {
       setLoading(false);
     };
     getUser();
-    
+
     const {
       data: {
         subscription
@@ -41,18 +41,18 @@ const Dashboard: React.FC = () => {
         navigate('/');
       }
     });
-    
+
     return () => {
       subscription.unsubscribe();
     };
   }, [navigate]);
-  
+
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center">
-        <p>Loading...</p>
-      </div>;
+      <p>Loading...</p>
+    </div>;
   }
-  
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -64,6 +64,7 @@ const Dashboard: React.FC = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/calendar" element={<CalendarView />} />
                 <Route path="/narratives" element={<Narratives />} />
+                <Route path="/narratives/:id" element={<NarrativeShow />} />
                 <Route path="/journal" element={<JournalEntries />} />
                 <Route path="/journal/create" element={<CreateJournalEntry />} />
                 <Route path="/journal/:id/edit" element={<EditJournalEntry />} />
