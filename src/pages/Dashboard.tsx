@@ -38,7 +38,8 @@ const Dashboard: React.FC = () => {
         const { data: journalEntryTagsData, error: tagsError } = await supabase
           .from('journal_entry_tags')
           .select('journal_entry_id, tag_id')
-          .in('tag_id', narrative.required_tags as string[]) // Cast to string[] to fix the type issue
+          // Explicitly type required_tags as string[] to help TypeScript
+          .in('tag_id', narrative.required_tags as string[])
           .eq('user_id', userId);
 
         if (tagsError) {
@@ -59,6 +60,7 @@ const Dashboard: React.FC = () => {
         const matchingEntryIds = Object.entries(entryCounts)
           .filter(([_, tags]) => {
             // Check if this entry has ALL the required tags
+            // Use null check before calling every method
             return narrative.required_tags && narrative.required_tags.every(tagId => tags.includes(tagId));
           })
           .map(([entryId]) => entryId);
