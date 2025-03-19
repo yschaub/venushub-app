@@ -93,6 +93,8 @@ export type CalendarEvent = {
     color?: VariantProps<typeof monthEventVariants>['variant'];
     className?: string;
     hasJournal?: boolean;
+    journalId?: string;
+    tags?: string[];
 };
 
 type CalendarProps = {
