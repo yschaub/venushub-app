@@ -333,8 +333,8 @@ const CalendarMonthView = () => {
     if (view !== 'month') return null;
 
     return (
-        <div className="h-full flex flex-col">
-            <div className="grid grid-cols-7 gap-px sticky top-0 bg-background border-b">
+        <div className="h-full flex flex-col overflow-auto">
+            <div className="grid grid-cols-7 gap-px bg-background border-b sticky top-0 z-10">
                 {weekDays.map((day, i) => (
                     <div
                         key={day}
@@ -347,7 +347,7 @@ const CalendarMonthView = () => {
                     </div>
                 ))}
             </div>
-            <div className="grid overflow-hidden -mt-px flex-1 auto-rows-fr p-px grid-cols-7 gap-px">
+            <div className="grid overflow-y-auto flex-1 auto-rows-[minmax(150px,1fr)] p-px grid-cols-7 gap-px">
                 {monthDates.map((_date) => {
                     const currentEvents = events.filter((event) =>
                         isSameDay(event.start, _date)
@@ -374,15 +374,13 @@ const CalendarMonthView = () => {
                                 return (
                                     <div
                                         key={event.id}
-                                        className="px-1 rounded text-sm flex items-center gap-1"
+                                        className="px-2 py-1 rounded-md text-sm flex items-center mb-1 bg-background border shadow-sm hover:shadow-md transition-shadow"
                                     >
-                                        <div
-                                            className={cn(
-                                                'shrink-0',
-                                                monthEventVariants({ variant: event.color })
-                                            )}
-                                        ></div>
-                                        <span className="flex-1 truncate">{event.title}</span>
+                                        <span className="flex-1 text-foreground">
+                                            {event.title.length > 24
+                                                ? `${event.title.substring(0, 24)}...`
+                                                : event.title}
+                                        </span>
                                     </div>
                                 );
                             })}
