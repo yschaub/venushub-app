@@ -95,6 +95,7 @@ export type CalendarEvent = {
     hasJournal?: boolean;
     journalId?: string;
     tags?: string[];
+    primary_event?: boolean;
 };
 
 type CalendarProps = {

@@ -119,17 +119,28 @@ const CalendarView = () => {
             hasJournal: hasJournal,
             journalId: journalId,
             tags: event.tags,
-            // Use a different style for events with journal entries
-            className: hasJournal
-              ? "bg-green-100 border-green-300 cursor-pointer"
-              : "bg-background border-border cursor-pointer"
+            primary_event: event.primary_event,
+            // Use different styles based on primary status
+            className: event.primary_event
+              ? (hasJournal
+                ? "bg-green-100 border-green-300 cursor-pointer"
+                : "bg-background border-border cursor-pointer")
+              : "bg-background border-border cursor-pointer text-muted-foreground text-xs"
           };
           console.log('Transformed event:', transformed);
           return transformed;
         });
 
-        console.log('Final transformed events:', transformedEvents);
-        setEvents(transformedEvents);
+        // Sort events: non-primary first, then by date
+        const sortedEvents = transformedEvents.sort((a, b) => {
+          if (a.primary_event !== b.primary_event) {
+            return a.primary_event ? 1 : -1; // Non-primary events come first
+          }
+          return a.start.getTime() - b.start.getTime();
+        });
+
+        console.log('Final transformed events:', sortedEvents);
+        setEvents(sortedEvents);
       } catch (error) {
         console.error('Error:', error);
       } finally {
@@ -313,13 +324,13 @@ const CalendarView = () => {
                             key={tag.id}
                             variant="secondary"
                             className={`${tag.category === 'Planets' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                                tag.category === 'Event' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
-                                  tag.category === 'Sign' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                                    tag.category === 'Aspect' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                                      tag.category === 'Direction' ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' :
-                                        tag.category === 'Cycle' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
-                                          tag.category === 'Houses' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' :
-                                            'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                              tag.category === 'Event' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                                tag.category === 'Sign' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                  tag.category === 'Aspect' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                                    tag.category === 'Direction' ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' :
+                                      tag.category === 'Cycle' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                                        tag.category === 'Houses' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' :
+                                          'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
                               }`}
                           >
                             {tag.name}
@@ -334,7 +345,7 @@ const CalendarView = () => {
           </SheetHeader>
 
           {/* Journal Entry Button */}
-          {selectedEvent && (
+          {selectedEvent?.primary_event && (
             <div className="mt-4">
               <Button
                 size="sm"
