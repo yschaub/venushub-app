@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link, BookOpen, Tag } from 'lucide-react';
 import {
   Calendar,
   CalendarCurrentDate,
@@ -20,6 +19,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -41,6 +41,12 @@ interface RelatedEvent {
   end_date: string;
 }
 
+interface SystemTag {
+  id: string;
+  name: string;
+  category: string;
+}
+
 const CalendarView = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +55,7 @@ const CalendarView = () => {
   const [relatedEvents, setRelatedEvents] = useState<RelatedEvent[]>([]);
   const [loadingRelatedEvents, setLoadingRelatedEvents] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [eventTags, setEventTags] = useState<SystemTag[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -56,7 +63,7 @@ const CalendarView = () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user?.id || null);
     };
-    
+
     fetchUserData();
   }, []);
 
@@ -103,7 +110,7 @@ const CalendarView = () => {
         const transformedEvents = (eventsData || []).map(event => {
           const hasJournal = eventJournalMap.has(event.id);
           const journalId = eventJournalMap.get(event.id);
-          
+
           const transformed = {
             id: event.id,
             title: event.title,
@@ -136,9 +143,26 @@ const CalendarView = () => {
   const handleEventClick = async (event: CalendarEvent) => {
     setSelectedEvent(event);
     setIsSheetOpen(true);
-    
+
     // Fetch related events when an event is selected
     await fetchRelatedEvents(event.id);
+
+    // Fetch tag information if the event has tags
+    if (event.tags && event.tags.length > 0) {
+      const { data: tagsData, error: tagsError } = await supabase
+        .from('system_tags')
+        .select('*')
+        .in('id', event.tags);
+
+      if (tagsError) {
+        console.error('Error fetching event tags:', tagsError);
+        return;
+      }
+
+      setEventTags(tagsData || []);
+    } else {
+      setEventTags([]);
+    }
   };
 
   const fetchRelatedEvents = async (eventId: string) => {
@@ -198,23 +222,23 @@ const CalendarView = () => {
 
   const handleJournalAction = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!currentUser) {
       navigate('/auth');
       return;
     }
-    
+
     if (selectedEvent?.hasJournal && selectedEvent?.journalId) {
       navigate(`/dashboard/journal/${selectedEvent.journalId}/edit`);
     } else if (selectedEvent) {
-      navigate('/dashboard/journal/create', { 
-        state: { 
+      navigate('/dashboard/journal/create', {
+        state: {
           eventData: {
             id: selectedEvent.id,
             title: selectedEvent.title,
             tags: selectedEvent.tags || [],
             date: format(selectedEvent.start, 'yyyy-MM-dd')
-          } 
+          }
         }
       });
     }
@@ -276,17 +300,45 @@ const CalendarView = () => {
                   <p>
                     <strong>Status:</strong> {selectedEvent.hasJournal ? 'Journal entry added' : 'No journal entry'}
                   </p>
+
+                  {eventTags.length > 0 && (
+                    <div className="mt-3">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+                        <Tag className="h-3 w-3" />
+                        <span>Tags:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {eventTags.map(tag => (
+                          <Badge
+                            key={tag.id}
+                            variant="secondary"
+                            className={`${tag.category === 'Planets' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                tag.category === 'Event' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                                  tag.category === 'Sign' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                    tag.category === 'Aspect' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                                      tag.category === 'Direction' ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' :
+                                        tag.category === 'Cycle' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                                          tag.category === 'Houses' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' :
+                                            'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                              }`}
+                          >
+                            {tag.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </SheetDescription>
           </SheetHeader>
-          
+
           {/* Journal Entry Button */}
           {selectedEvent && (
             <div className="mt-4">
-              <Button 
-                size="sm" 
-                variant="outline" 
+              <Button
+                size="sm"
+                variant="outline"
                 className="flex items-center gap-1 w-full"
                 onClick={handleJournalAction}
               >
@@ -303,7 +355,7 @@ const CalendarView = () => {
               Connected Events
             </h3>
             <Separator className="my-2" />
-            
+
             {loadingRelatedEvents ? (
               <p className="text-sm text-muted-foreground">Loading connected events...</p>
             ) : relatedEvents.length > 0 ? (
@@ -315,9 +367,9 @@ const CalendarView = () => {
                       <CalendarIcon size={14} />
                       <span>{format(new Date(event.start_date), 'MMM d')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="mt-2 text-xs"
                       onClick={() => {
                         // Find the corresponding calendar event
