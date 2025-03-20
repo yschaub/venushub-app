@@ -202,6 +202,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
                             <SidebarMenuSubButton
                               onClick={() => handleNavigation(`/dashboard/narratives/${narrative.id}`)}
                               size="sm"
+                              className="cursor-pointer"
                             >
                               {narrative.title}
                             </SidebarMenuSubButton>
@@ -211,7 +212,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
                         <SidebarMenuSubButton
                           onClick={() => handleCreateNarrative(category.id, category.name)}
                           size="sm"
-                          className="text-muted-foreground hover:text-primary"
+                          className="text-muted-foreground hover:text-primary cursor-pointer"
                         >
                           + Create new narrative
                         </SidebarMenuSubButton>
