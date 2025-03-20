@@ -2,8 +2,8 @@
 import * as React from "react"
 import { X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Command, CommandGroup, CommandItem } from "@/components/ui/command"
-import { Command as CommandPrimitive } from "cmdk"
+import { CommandItem } from "@/components/ui/command"
+import { cn } from "@/lib/utils"
 
 type Tag = {
   id: string
@@ -89,22 +89,22 @@ export function TagsInput({
       {open && selectableOptions.length > 0 && (
         <div className="relative">
           <div className="absolute top-0 z-10 w-full bg-popover text-popover-foreground rounded-md border border-border shadow-md animate-in">
-            <Command className="h-full overflow-auto max-h-[300px]">
-              <CommandGroup>
-                {selectableOptions.map((tag) => (
-                  <CommandItem
-                    key={tag.id}
-                    onSelect={() => {
-                      onTagsChange([...selectedTags, tag.id])
-                      setInputValue("")
-                    }}
-                    className="cursor-pointer"
-                  >
-                    {tag.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </Command>
+            <div className="overflow-auto max-h-[300px] p-1">
+              {selectableOptions.map((tag) => (
+                <div
+                  key={tag.id}
+                  onClick={() => {
+                    onTagsChange([...selectedTags, tag.id])
+                    setInputValue("")
+                  }}
+                  className={cn(
+                    "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50"
+                  )}
+                >
+                  {tag.name}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
