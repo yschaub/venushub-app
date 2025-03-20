@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Calendar, BookText, LogOut, BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, BookText, LogOut, BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Sidebar,
@@ -145,12 +145,12 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              isActive={window.location.pathname === '/dashboard'}
-              onClick={() => handleNavigation('/dashboard')}
-              tooltip="Home"
+              isActive={window.location.pathname === '/dashboard/calendar'}
+              onClick={() => handleNavigation('/dashboard/calendar')}
+              tooltip="Calendar"
             >
-              <Home />
-              <span>Home</span>
+              <Calendar />
+              <span>Calendar</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
 
@@ -222,17 +222,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
               ))}
             </SidebarMenuSub>
           )}
-
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={window.location.pathname === '/dashboard/calendar'}
-              onClick={() => handleNavigation('/dashboard/calendar')}
-              tooltip="Calendar"
-            >
-              <Calendar />
-              <span>Calendar</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarContent>
 

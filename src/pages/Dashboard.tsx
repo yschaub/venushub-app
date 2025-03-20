@@ -3,7 +3,6 @@ import { useNavigate, Routes, Route } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import DashboardSidebar from '@/components/DashboardSidebar';
-import Home from '@/pages/Home';
 import JournalEntries from '@/pages/JournalEntries';
 import CreateJournalEntry from '@/pages/CreateJournalEntry';
 import EditJournalEntry from '@/pages/EditJournalEntry';
@@ -35,9 +34,9 @@ const Dashboard: React.FC = () => {
         // Find journal entries that have ALL the required tags for this narrative
         // Convert required_tags to a simple string[] to avoid TypeScript recursion
         const requiredTags = narrative.required_tags as unknown as string[];
-        
+
         if (!requiredTags.length) continue;
-        
+
         const { data: journalEntryTagsData, error: tagsError } = await supabase
           .from('journal_entry_tags')
           .select('journal_entry_id, tag_id')
@@ -80,10 +79,10 @@ const Dashboard: React.FC = () => {
         }
 
         const existingEntryIds = existingAssociations.map(item => item.journal_entry_id);
-        
+
         // Find entries that need to be added
         const entriesToAdd = matchingEntryIds.filter(id => !existingEntryIds.includes(id));
-        
+
         if (entriesToAdd.length === 0) continue;
 
         // Add new associations
@@ -117,10 +116,10 @@ const Dashboard: React.FC = () => {
         return;
       }
       setUserEmail(user.email);
-      
+
       // Associate journal entries with narratives based on tags
       await associateEntriesWithNarratives(user.id);
-      
+
       setLoading(false);
     };
     getUser();
@@ -154,7 +153,7 @@ const Dashboard: React.FC = () => {
           <div className="flex h-full flex-col">
             <div className="flex-grow overflow-auto">
               <Routes>
-                <Route path="/" element={<Home />} />
+                <Route path="/" element={<CalendarView />} />
                 <Route path="/calendar" element={<CalendarView />} />
                 <Route path="/narratives" element={<Narratives />} />
                 <Route path="/narratives/:id" element={<NarrativeShow />} />
