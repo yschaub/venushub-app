@@ -49,8 +49,11 @@ export function TagsInput({
   )
 
   return (
-    <Command onKeyDown={handleKeyDown} className="overflow-visible bg-transparent">
-      <div className="group border border-input px-3 py-2 rounded-md flex items-center flex-wrap gap-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background">
+    <div className="flex flex-col gap-2">
+      <div 
+        className="group border border-input px-3 py-2 rounded-md flex items-center flex-wrap gap-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
+        onKeyDown={handleKeyDown}
+      >
         {selectedTags.map((tagId) => {
           const tag = availableTags.find((t) => t.id === tagId)
           if (!tag) return null
@@ -70,37 +73,41 @@ export function TagsInput({
           )
         })}
         
-        <CommandPrimitive.Input
+        <input
           ref={inputRef}
           value={inputValue}
-          onValueChange={setInputValue}
-          onBlur={() => setOpen(false)}
+          onChange={(e) => setInputValue(e.target.value)}
           onFocus={() => setOpen(true)}
+          onBlur={() => {
+            setTimeout(() => setOpen(false), 200)
+          }}
           placeholder={selectedTags.length === 0 ? placeholder : ""}
           className="ml-1 bg-transparent outline-none placeholder:text-muted-foreground flex-1 min-w-[120px] h-7"
         />
       </div>
       
-      <div className="relative mt-2">
-        {open && selectableOptions.length > 0 && (
+      {open && selectableOptions.length > 0 && (
+        <div className="relative">
           <div className="absolute top-0 z-10 w-full bg-popover text-popover-foreground rounded-md border border-border shadow-md animate-in">
-            <CommandGroup className="h-full overflow-auto max-h-[300px]">
-              {selectableOptions.map((tag) => (
-                <CommandItem
-                  key={tag.id}
-                  onSelect={() => {
-                    onTagsChange([...selectedTags, tag.id])
-                    setInputValue("")
-                  }}
-                  className="cursor-pointer"
-                >
-                  {tag.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            <Command className="h-full overflow-auto max-h-[300px]">
+              <CommandGroup>
+                {selectableOptions.map((tag) => (
+                  <CommandItem
+                    key={tag.id}
+                    onSelect={() => {
+                      onTagsChange([...selectedTags, tag.id])
+                      setInputValue("")
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {tag.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </Command>
           </div>
-        )}
-      </div>
-    </Command>
+        </div>
+      )}
+    </div>
   )
 }
