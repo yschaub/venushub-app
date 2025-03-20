@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -18,16 +17,16 @@ const JournalEntries: React.FC = () => {
     const fetchEntries = async () => {
       try {
         setIsLoading(true);
-        
+
         // Get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
+
         if (userError) throw userError;
-        
+
         if (!user) {
           throw new Error("No authenticated user found");
         }
-        
+
         // Fetch entries for current user only
         const { data: entriesData, error: entriesError } = await supabase
           .from('journal_entries')
@@ -36,12 +35,12 @@ const JournalEntries: React.FC = () => {
           .order('date_created', { ascending: false });
 
         if (entriesError) throw entriesError;
-        
+
         const { data: tagsData, error: tagsError } = await supabase
           .from('system_tags')
           .select('*')
           .order('name');
-          
+
         if (tagsError) throw tagsError;
 
         // Fetch tags for each entry
@@ -51,9 +50,9 @@ const JournalEntries: React.FC = () => {
               .from('journal_entry_tags')
               .select('tag_id')
               .eq('journal_entry_id', entry.id);
-              
+
             if (entryTagsError) throw entryTagsError;
-            
+
             return {
               ...entry,
               tags: entryTags.map(et => et.tag_id)
@@ -85,27 +84,27 @@ const JournalEntries: React.FC = () => {
         .from('narrative_journal_entries')
         .delete()
         .eq('journal_entry_id', id);
-        
+
       if (narrativeEntriesError) throw narrativeEntriesError;
-      
+
       // Then delete any journal_entry_tags references
       const { error: entryTagsError } = await supabase
         .from('journal_entry_tags')
         .delete()
         .eq('journal_entry_id', id);
-        
+
       if (entryTagsError) throw entryTagsError;
-      
+
       // Finally delete the journal entry itself
       const { error } = await supabase
         .from('journal_entries')
         .delete()
         .eq('id', id);
-        
+
       if (error) throw error;
-      
+
       setEntries(entries.filter(entry => entry.id !== id));
-      
+
       toast({
         title: "Success",
         description: "Journal entry deleted successfully"
@@ -124,18 +123,11 @@ const JournalEntries: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Journal Entries</h2>
-        <Button 
-          onClick={() => navigate('/dashboard/journal/create')} 
-          className="flex items-center gap-2"
-        >
-          <PlusCircle className="h-4 w-4" />
-          New Entry
-        </Button>
       </div>
 
-      <JournalEntryList 
-        entries={entries} 
-        isLoading={isLoading} 
+      <JournalEntryList
+        entries={entries}
+        isLoading={isLoading}
         onDelete={handleDeleteEntry}
         tags={tags}
       />

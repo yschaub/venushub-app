@@ -104,7 +104,10 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
             </div>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap">{entry.content}</p>
+            <div
+              className="whitespace-pre-wrap prose dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: entry.content }}
+            />
           </CardContent>
           {entry.tags && entry.tags.length > 0 && (
             <CardFooter className="pt-0 flex flex-wrap gap-2">
