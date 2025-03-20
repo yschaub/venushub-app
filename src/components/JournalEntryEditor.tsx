@@ -280,7 +280,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
       const formattedDate = entryDate ? format(entryDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
 
       if (mode === 'create') {
-        // First check if an entry already exists for this event
         if (eventId) {
           const { data: existingEntry, error: checkError } = await supabase
             .from('journal_entries')
@@ -292,7 +291,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           if (checkError) {
             console.error('Error checking existing entry:', checkError);
           } else if (existingEntry) {
-            // A journal entry already exists for this event, redirect to edit it
             toast({
               title: "Information",
               description: "You already have a journal entry for this event. Redirecting to edit it.",
@@ -305,7 +303,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           }
         }
 
-        // No existing entry, create a new one
         const { data: entry, error: entryError } = await supabase
           .from('journal_entries')
           .insert({
@@ -472,42 +469,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Entry title"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="date">Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                    id="date"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {entryDate ? format(entryDate, 'PPP') : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={entryDate}
-                    onSelect={(date) => setEntryDate(date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div>
-              <Label htmlFor="content">Content</Label>
+              <Label htmlFor="content">Journal Entry</Label>
               <div className="min-h-[200px] border rounded-md">
                 <RichTextEditor
                   ref={editorRef}

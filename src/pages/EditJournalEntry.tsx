@@ -125,7 +125,9 @@ const EditJournalEntry: React.FC = () => {
       </div>
       
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold">Edit Journal Entry</h2>
+        <h2 className="text-2xl font-semibold">
+          {entry.title ? `Edit: ${entry.title}` : 'Edit Journal Entry'}
+        </h2>
         <p className="text-muted-foreground mt-1">
           Update your entry and add annotations
         </p>
