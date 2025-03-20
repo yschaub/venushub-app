@@ -328,7 +328,7 @@ const NarrativeShow: React.FC = () => {
                                         variant="link"
                                         size="sm"
                                         className="p-0 h-auto"
-                                        onClick={() => navigate(`/dashboard/journal/${entry.id}`)}
+                                        onClick={() => navigate(`/dashboard/journal/${entry.id}/edit`)}
                                     >
                                         View entry
                                     </Button>
