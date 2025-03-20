@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -79,6 +80,7 @@ type ContextType = {
     setEvents: (date: CalendarEvent[]) => void;
     onChangeView?: (view: View) => void;
     onEventClick?: (event: CalendarEvent) => void;
+    onChangeDate?: (date: Date) => void;
     enableHotkeys?: boolean;
     today: Date;
 };
@@ -107,6 +109,7 @@ type CalendarProps = {
     enableHotkeys?: boolean;
     onChangeView?: (view: View) => void;
     onEventClick?: (event: CalendarEvent) => void;
+    onChangeDate?: (date: Date) => void;
 };
 
 const Calendar = ({
@@ -118,6 +121,7 @@ const Calendar = ({
     onEventClick,
     events: defaultEvents = [],
     onChangeView,
+    onChangeDate,
 }: CalendarProps) => {
     const [view, setView] = useState<View>(_defaultMode);
     const [date, setDate] = useState(defaultDate);
@@ -126,6 +130,12 @@ const Calendar = ({
     const changeView = (view: View) => {
         setView(view);
         onChangeView?.(view);
+    };
+
+    // Handle date changes and notify parent component if needed
+    const handleDateChange = (newDate: Date) => {
+        setDate(newDate);
+        onChangeDate?.(newDate);
     };
 
     useHotkeys('m', () => changeView('month'), {
@@ -150,13 +160,14 @@ const Calendar = ({
                 view,
                 setView,
                 date,
-                setDate,
+                setDate: handleDateChange,
                 events,
                 setEvents,
                 locale,
                 enableHotkeys,
                 onEventClick,
                 onChangeView,
+                onChangeDate,
                 today: new Date(),
             }}
         >
@@ -468,19 +479,24 @@ const CalendarNextTrigger = forwardRef<
     HTMLButtonElement,
     React.HTMLAttributes<HTMLButtonElement>
 >(({ children, onClick, ...props }, ref) => {
-    const { date, setDate, view, enableHotkeys } = useCalendar();
+    const { date, setDate, view, enableHotkeys, onChangeDate } = useCalendar();
 
     const next = useCallback(() => {
+        let newDate;
         if (view === 'day') {
-            setDate(addDays(date, 1));
+            newDate = addDays(date, 1);
         } else if (view === 'week') {
-            setDate(addWeeks(date, 1));
+            newDate = addWeeks(date, 1);
         } else if (view === 'month') {
-            setDate(addMonths(date, 1));
+            newDate = addMonths(date, 1);
         } else if (view === 'year') {
-            setDate(addYears(date, 1));
+            newDate = addYears(date, 1);
+        } else {
+            newDate = date;
         }
-    }, [date, view, setDate]);
+        setDate(newDate);
+        onChangeDate?.(newDate);
+    }, [date, view, setDate, onChangeDate]);
 
     useHotkeys('ArrowRight', () => next(), {
         enabled: enableHotkeys,
@@ -507,23 +523,28 @@ const CalendarPrevTrigger = forwardRef<
     HTMLButtonElement,
     React.HTMLAttributes<HTMLButtonElement>
 >(({ children, onClick, ...props }, ref) => {
-    const { date, setDate, view, enableHotkeys } = useCalendar();
+    const { date, setDate, view, enableHotkeys, onChangeDate } = useCalendar();
+
+    const prev = useCallback(() => {
+        let newDate;
+        if (view === 'day') {
+            newDate = subDays(date, 1);
+        } else if (view === 'week') {
+            newDate = subWeeks(date, 1);
+        } else if (view === 'month') {
+            newDate = subMonths(date, 1);
+        } else if (view === 'year') {
+            newDate = subYears(date, 1);
+        } else {
+            newDate = date;
+        }
+        setDate(newDate);
+        onChangeDate?.(newDate);
+    }, [date, view, setDate, onChangeDate]);
 
     useHotkeys('ArrowLeft', () => prev(), {
         enabled: enableHotkeys,
     });
-
-    const prev = useCallback(() => {
-        if (view === 'day') {
-            setDate(subDays(date, 1));
-        } else if (view === 'week') {
-            setDate(subWeeks(date, 1));
-        } else if (view === 'month') {
-            setDate(subMonths(date, 1));
-        } else if (view === 'year') {
-            setDate(subYears(date, 1));
-        }
-    }, [date, view, setDate]);
 
     return (
         <Button
@@ -546,15 +567,16 @@ const CalendarTodayTrigger = forwardRef<
     HTMLButtonElement,
     React.HTMLAttributes<HTMLButtonElement>
 >(({ children, onClick, ...props }, ref) => {
-    const { setDate, enableHotkeys, today } = useCalendar();
+    const { setDate, enableHotkeys, today, onChangeDate } = useCalendar();
+
+    const jumpToToday = useCallback(() => {
+        setDate(today);
+        onChangeDate?.(today);
+    }, [today, setDate, onChangeDate]);
 
     useHotkeys('t', () => jumpToToday(), {
         enabled: enableHotkeys,
     });
-
-    const jumpToToday = useCallback(() => {
-        setDate(today);
-    }, [today, setDate]);
 
     return (
         <Button

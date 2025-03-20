@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link, BookOpen, Tag } from 'lucide-react';
 import {
@@ -20,8 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addMonths, isSameMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { toast } from "sonner";
 
 interface Event {
   id: string;
@@ -47,6 +48,10 @@ interface SystemTag {
   category: string;
 }
 
+interface EventCache {
+  [monthKey: string]: CalendarEvent[];
+}
+
 const CalendarView = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +61,14 @@ const CalendarView = () => {
   const [loadingRelatedEvents, setLoadingRelatedEvents] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [eventTags, setEventTags] = useState<SystemTag[]>([]);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [eventCache, setEventCache] = useState<EventCache>({});
+  const [loadingMonth, setLoadingMonth] = useState(false);
   const navigate = useNavigate();
+
+  const getMonthKey = useCallback((date: Date) => {
+    return format(date, 'yyyy-MM');
+  }, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -67,98 +79,132 @@ const CalendarView = () => {
     fetchUserData();
   }, []);
 
+  const fetchEventsForMonth = useCallback(async (date: Date) => {
+    const monthKey = getMonthKey(date);
+    
+    if (eventCache[monthKey]) {
+      setEvents(eventCache[monthKey]);
+      setLoading(false);
+      return;
+    }
+
+    setLoadingMonth(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found');
+        return;
+      }
+
+      const firstDay = startOfMonth(date);
+      const lastDay = endOfMonth(date);
+
+      console.log(`Fetching events from ${format(firstDay, 'yyyy-MM-dd')} to ${format(lastDay, 'yyyy-MM-dd')}`);
+
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .or(`start_date.gte.${format(firstDay, 'yyyy-MM-dd')},end_date.gte.${format(firstDay, 'yyyy-MM-dd')}`)
+        .or(`start_date.lte.${format(lastDay, 'yyyy-MM-dd')},end_date.lte.${format(lastDay, 'yyyy-MM-dd')}`)
+        .order('start_date', { ascending: true });
+
+      if (eventsError) {
+        console.error('Error fetching events:', eventsError);
+        toast.error("Failed to load events");
+        return;
+      }
+
+      const eventIds = eventsData.map(event => event.id);
+
+      const { data: journalEntries, error: journalError } = await supabase
+        .from('journal_entries')
+        .select('id, event_id')
+        .eq('user_id', user.id)
+        .in('event_id', eventIds)
+        .not('event_id', 'is', null);
+
+      if (journalError) {
+        console.error('Error fetching journal entries:', journalError);
+      }
+
+      const eventJournalMap = new Map();
+      journalEntries?.forEach(entry => {
+        eventJournalMap.set(entry.event_id, entry.id);
+      });
+
+      const transformedEvents = (eventsData || []).map(event => {
+        const hasJournal = eventJournalMap.has(event.id);
+        const journalId = eventJournalMap.get(event.id);
+
+        return {
+          id: event.id,
+          title: event.title,
+          start: new Date(event.start_date),
+          end: new Date(event.end_date),
+          hasJournal: hasJournal,
+          journalId: journalId,
+          tags: event.tags,
+          primary_event: event.primary_event,
+          className: event.primary_event
+            ? (hasJournal
+              ? "bg-green-100 border-green-300 cursor-pointer"
+              : "bg-background border-border cursor-pointer")
+            : "bg-background border-border cursor-pointer text-muted-foreground text-xs"
+        };
+      });
+
+      const sortedEvents = transformedEvents.sort((a, b) => {
+        if (a.primary_event !== b.primary_event) {
+          return a.primary_event ? 1 : -1;
+        }
+        return a.start.getTime() - b.start.getTime();
+      });
+
+      setEventCache(prev => ({
+        ...prev,
+        [monthKey]: sortedEvents
+      }));
+
+      setEvents(sortedEvents);
+      console.log(`Loaded ${sortedEvents.length} events for ${monthKey}`);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Failed to load events");
+    } finally {
+      setLoading(false);
+      setLoadingMonth(false);
+    }
+  }, [eventCache, getMonthKey]);
+
   useEffect(() => {
-    const fetchEvents = async () => {
-      setLoading(true);
-      try {
-        console.log('Fetching events...');
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          console.error('No authenticated user found');
-          return;
-        }
+    fetchEventsForMonth(currentDate);
+  }, [currentDate, fetchEventsForMonth]);
 
-        const { data: eventsData, error: eventsError } = await supabase
-          .from('events')
-          .select('*')
-          .order('start_date', { ascending: true });
-
-        if (eventsError) {
-          console.error('Error fetching events:', eventsError);
-          return;
-        }
-
-        // Fetch journal entries to check which events have them
-        const { data: journalEntries, error: journalError } = await supabase
-          .from('journal_entries')
-          .select('id, event_id')
-          .eq('user_id', user.id)
-          .not('event_id', 'is', null);
-
-        if (journalError) {
-          console.error('Error fetching journal entries:', journalError);
-          return;
-        }
-
-        // Create a Map of event IDs that have journal entries
-        const eventJournalMap = new Map();
-        journalEntries?.forEach(entry => {
-          eventJournalMap.set(entry.event_id, entry.id);
-        });
-
-        // Transform events to match the calendar format
-        const transformedEvents = (eventsData || []).map(event => {
-          const hasJournal = eventJournalMap.has(event.id);
-          const journalId = eventJournalMap.get(event.id);
-
-          const transformed = {
-            id: event.id,
-            title: event.title,
-            start: new Date(event.start_date),
-            end: new Date(event.end_date),
-            hasJournal: hasJournal,
-            journalId: journalId,
-            tags: event.tags,
-            primary_event: event.primary_event,
-            // Use different styles based on primary status
-            className: event.primary_event
-              ? (hasJournal
-                ? "bg-green-100 border-green-300 cursor-pointer"
-                : "bg-background border-border cursor-pointer")
-              : "bg-background border-border cursor-pointer text-muted-foreground text-xs"
-          };
-          console.log('Transformed event:', transformed);
-          return transformed;
-        });
-
-        // Sort events: non-primary first, then by date
-        const sortedEvents = transformedEvents.sort((a, b) => {
-          if (a.primary_event !== b.primary_event) {
-            return a.primary_event ? 1 : -1; // Non-primary events come first
-          }
-          return a.start.getTime() - b.start.getTime();
-        });
-
-        console.log('Final transformed events:', sortedEvents);
-        setEvents(sortedEvents);
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
+  useEffect(() => {
+    const prefetchAdjacentMonths = async () => {
+      const nextMonth = addMonths(currentDate, 1);
+      const prevMonth = addMonths(currentDate, -1);
+      
+      if (!eventCache[getMonthKey(nextMonth)]) {
+        fetchEventsForMonth(nextMonth);
+      }
+      
+      if (!eventCache[getMonthKey(prevMonth)]) {
+        fetchEventsForMonth(prevMonth);
       }
     };
-
-    fetchEvents();
-  }, []);
+    
+    if (!loading && Object.keys(eventCache).length > 0) {
+      prefetchAdjacentMonths();
+    }
+  }, [currentDate, eventCache, fetchEventsForMonth, getMonthKey, loading]);
 
   const handleEventClick = async (event: CalendarEvent) => {
     setSelectedEvent(event);
     setIsSheetOpen(true);
 
-    // Fetch related events when an event is selected
     await fetchRelatedEvents(event.id);
 
-    // Fetch tag information if the event has tags
     if (event.tags && event.tags.length > 0) {
       const { data: tagsData, error: tagsError } = await supabase
         .from('system_tags')
@@ -179,7 +225,6 @@ const CalendarView = () => {
   const fetchRelatedEvents = async (eventId: string) => {
     setLoadingRelatedEvents(true);
     try {
-      // First, get all relationships for this event
       const { data: relationships, error: relationshipsError } = await supabase
         .from('event_relationships')
         .select('related_event_id')
@@ -190,7 +235,6 @@ const CalendarView = () => {
         return;
       }
 
-      // Also get relationships where this event is the related one
       const { data: inverseRelationships, error: inverseError } = await supabase
         .from('event_relationships')
         .select('event_id')
@@ -201,7 +245,6 @@ const CalendarView = () => {
         return;
       }
 
-      // Combine all related event IDs
       const relatedEventIds = [
         ...(relationships?.map(rel => rel.related_event_id) || []),
         ...(inverseRelationships?.map(rel => rel.event_id) || [])
@@ -212,7 +255,6 @@ const CalendarView = () => {
         return;
       }
 
-      // Fetch details for all related events
       const { data: relatedEventsData, error: relatedEventsError } = await supabase
         .from('events')
         .select('id, title, start_date, end_date')
@@ -255,7 +297,24 @@ const CalendarView = () => {
     }
   };
 
-  if (loading) {
+  const handleMonthChange = (date: Date) => {
+    setCurrentDate(date);
+    
+    const monthKey = getMonthKey(date);
+    if (!eventCache[monthKey]) {
+      fetchEventsForMonth(date);
+    } else {
+      setEvents(eventCache[monthKey]);
+    }
+    
+    const nextMonth = addMonths(date, 1);
+    const nextMonthKey = getMonthKey(nextMonth);
+    if (!eventCache[nextMonthKey]) {
+      fetchEventsForMonth(nextMonth);
+    }
+  };
+
+  if (loading && !eventCache[getMonthKey(currentDate)]) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-muted-foreground">Loading calendar...</p>
@@ -269,6 +328,8 @@ const CalendarView = () => {
         events={events}
         view="month"
         onEventClick={handleEventClick}
+        defaultDate={currentDate}
+        onChangeDate={handleMonthChange}
       >
         <div className="h-dvh py-6 flex flex-col">
           <div className="flex px-6 items-center gap-2 mb-6">
@@ -291,6 +352,11 @@ const CalendarView = () => {
 
           <div className="flex-1 overflow-auto px-6 relative">
             <CalendarMonthView />
+            {loadingMonth && (
+              <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+                <div className="text-sm text-muted-foreground">Loading events...</div>
+              </div>
+            )}
           </div>
         </div>
       </Calendar>
@@ -344,7 +410,6 @@ const CalendarView = () => {
             </SheetDescription>
           </SheetHeader>
 
-          {/* Journal Entry Button */}
           {selectedEvent?.primary_event && (
             <div className="mt-4">
               <Button
@@ -359,7 +424,6 @@ const CalendarView = () => {
             </div>
           )}
 
-          {/* Related Events Section */}
           <div className="mt-6">
             <h3 className="text-lg font-medium flex items-center gap-2">
               <Link size={18} />
@@ -383,7 +447,6 @@ const CalendarView = () => {
                       size="sm"
                       className="mt-2 text-xs"
                       onClick={() => {
-                        // Find the corresponding calendar event
                         const calendarEvent = events.find(e => e.id === event.id);
                         if (calendarEvent) {
                           setSelectedEvent(calendarEvent);
