@@ -2,7 +2,6 @@
 import * as React from "react"
 import { X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { CommandItem } from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 
 type Tag = {
@@ -45,7 +44,9 @@ export function TagsInput({
   }
 
   const selectableOptions = availableTags.filter(
-    (tag) => !selectedTags.includes(tag.id)
+    (tag) => 
+      !selectedTags.includes(tag.id) && 
+      (inputValue === "" || tag.name.toLowerCase().includes(inputValue.toLowerCase()))
   )
 
   return (
@@ -76,7 +77,10 @@ export function TagsInput({
         <input
           ref={inputRef}
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => {
+            setInputValue(e.target.value)
+            if (!open) setOpen(true)
+          }}
           onFocus={() => setOpen(true)}
           onBlur={() => {
             setTimeout(() => setOpen(false), 200)
