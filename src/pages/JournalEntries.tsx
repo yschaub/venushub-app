@@ -80,6 +80,23 @@ const JournalEntries: React.FC = () => {
 
   const handleDeleteEntry = async (id: string) => {
     try {
+      // First delete any narrative_journal_entries references
+      const { error: narrativeEntriesError } = await supabase
+        .from('narrative_journal_entries')
+        .delete()
+        .eq('journal_entry_id', id);
+        
+      if (narrativeEntriesError) throw narrativeEntriesError;
+      
+      // Then delete any journal_entry_tags references
+      const { error: entryTagsError } = await supabase
+        .from('journal_entry_tags')
+        .delete()
+        .eq('journal_entry_id', id);
+        
+      if (entryTagsError) throw entryTagsError;
+      
+      // Finally delete the journal entry itself
       const { error } = await supabase
         .from('journal_entries')
         .delete()
