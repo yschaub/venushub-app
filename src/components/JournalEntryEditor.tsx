@@ -2,21 +2,15 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import AnnotationSidebar from '@/components/AnnotationSidebar';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import RichTextEditor, { RichTextEditorRef, AnnotationMark } from './editor/RichTextEditor';
+import { TagsInput } from '@/components/ui/tags-input';
 
 interface Tag {
   id: string;
@@ -518,34 +512,15 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
               </div>
             )}
 
-            {Object.keys(tagsByCategory).length > 0 && (
+            {tags.length > 0 && (
               <div className="space-y-2">
-                <Label>Tags</Label>
-                <Accordion type="multiple" className="w-full space-y-2">
-                  {Object.entries(tagsByCategory).map(([category, categoryTags]) => (
-                    <AccordionItem key={category} value={category} className="border rounded-md">
-                      <AccordionTrigger className="px-4 py-2 hover:no-underline">
-                        {category}
-                      </AccordionTrigger>
-                      <AccordionContent className="px-4 pb-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          {categoryTags.map(tag => (
-                            <div key={tag.id} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`tag-${tag.id}`}
-                                checked={selectedTags.includes(tag.id)}
-                                onCheckedChange={() => handleTagToggle(tag.id)}
-                              />
-                              <Label htmlFor={`tag-${tag.id}`} className="cursor-pointer">
-                                {tag.name}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
+                <Label htmlFor="tags">Tags</Label>
+                <TagsInput
+                  availableTags={tags}
+                  selectedTags={selectedTags}
+                  onTagsChange={setSelectedTags}
+                  placeholder="Select tags..."
+                />
               </div>
             )}
 
