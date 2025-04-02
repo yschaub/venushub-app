@@ -11,12 +11,12 @@ import {
   CalendarEvent as BaseCalendarEvent,
 } from '@/components/ui/full-calendar';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -367,11 +367,11 @@ const CalendarView = () => {
         </div>
       </Calendar>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>{selectedEvent?.title}</SheetTitle>
-            <SheetDescription className="space-y-3">
+      <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedEvent?.title}</DialogTitle>
+            <DialogDescription className="space-y-3">
               {selectedEvent && (
                 <>
                   <p>
@@ -420,8 +420,8 @@ const CalendarView = () => {
                   )}
                 </>
               )}
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           {selectedEvent?.primary_event && (
             <div className="mt-4">
@@ -476,8 +476,8 @@ const CalendarView = () => {
               <p className="text-sm text-muted-foreground">No connected events found</p>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
