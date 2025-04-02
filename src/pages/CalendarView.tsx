@@ -8,7 +8,7 @@ import {
   CalendarNextTrigger,
   CalendarPrevTrigger,
   CalendarTodayTrigger,
-  CalendarEvent,
+  CalendarEvent as BaseCalendarEvent,
 } from '@/components/ui/full-calendar';
 import {
   Sheet,
@@ -52,6 +52,11 @@ interface EventCache {
   [monthKey: string]: CalendarEvent[];
 }
 
+interface CalendarEvent extends BaseCalendarEvent {
+  start_date?: string;
+  end_date?: string;
+}
+
 const CalendarView = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +86,7 @@ const CalendarView = () => {
 
   const fetchEventsForMonth = useCallback(async (date: Date) => {
     const monthKey = getMonthKey(date);
-    
+
     if (eventCache[monthKey]) {
       setEvents(eventCache[monthKey]);
       setLoading(false);
@@ -104,9 +109,8 @@ const CalendarView = () => {
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
-        .or(`start_date.gte.${format(firstDay, 'yyyy-MM-dd')},end_date.gte.${format(firstDay, 'yyyy-MM-dd')}`)
-        .or(`start_date.lte.${format(lastDay, 'yyyy-MM-dd')},end_date.lte.${format(lastDay, 'yyyy-MM-dd')}`)
-        .order('start_date', { ascending: true });
+        .or(`date.gte.${format(firstDay, 'yyyy-MM-dd')},date.lte.${format(lastDay, 'yyyy-MM-dd')}`)
+        .order('date', { ascending: true });
 
       if (eventsError) {
         console.error('Error fetching events:', eventsError);
@@ -139,12 +143,14 @@ const CalendarView = () => {
         return {
           id: event.id,
           title: event.title,
-          start: new Date(event.start_date),
-          end: new Date(event.end_date),
+          start: new Date(event.date),
+          end: new Date(event.date),
           hasJournal: hasJournal,
           journalId: journalId,
           tags: event.tags,
           primary_event: event.primary_event,
+          start_date: event.start_date,
+          end_date: event.end_date,
           className: event.primary_event
             ? (hasJournal
               ? "bg-green-100 border-green-300 cursor-pointer"
@@ -184,16 +190,16 @@ const CalendarView = () => {
     const prefetchAdjacentMonths = async () => {
       const nextMonth = addMonths(currentDate, 1);
       const prevMonth = addMonths(currentDate, -1);
-      
+
       if (!eventCache[getMonthKey(nextMonth)]) {
         fetchEventsForMonth(nextMonth);
       }
-      
+
       if (!eventCache[getMonthKey(prevMonth)]) {
         fetchEventsForMonth(prevMonth);
       }
     };
-    
+
     if (!loading && Object.keys(eventCache).length > 0) {
       prefetchAdjacentMonths();
     }
@@ -299,14 +305,14 @@ const CalendarView = () => {
 
   const handleMonthChange = (date: Date) => {
     setCurrentDate(date);
-    
+
     const monthKey = getMonthKey(date);
     if (!eventCache[monthKey]) {
       fetchEventsForMonth(date);
     } else {
       setEvents(eventCache[monthKey]);
     }
-    
+
     const nextMonth = addMonths(date, 1);
     const nextMonthKey = getMonthKey(nextMonth);
     if (!eventCache[nextMonthKey]) {
@@ -369,11 +375,18 @@ const CalendarView = () => {
               {selectedEvent && (
                 <>
                   <p>
-                    <strong>Start:</strong> {format(selectedEvent.start, 'PPP')}
+                    <strong>Date:</strong> {format(selectedEvent.start, 'PPP')}
                   </p>
-                  <p>
-                    <strong>End:</strong> {format(selectedEvent.end, 'PPP')}
-                  </p>
+                  {selectedEvent.start_date && selectedEvent.end_date && (
+                    <>
+                      <p>
+                        <strong>Start:</strong> {format(new Date(selectedEvent.start_date), 'PPP')}
+                      </p>
+                      <p>
+                        <strong>End:</strong> {format(new Date(selectedEvent.end_date), 'PPP')}
+                      </p>
+                    </>
+                  )}
                   <p>
                     <strong>Status:</strong> {selectedEvent.hasJournal ? 'Journal entry added' : 'No journal entry'}
                   </p>
