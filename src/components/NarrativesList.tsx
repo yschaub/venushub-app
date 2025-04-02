@@ -4,7 +4,20 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, BookOpen, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, BookOpen, ChevronRight, Tag } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
+interface Tag {
+  id: string;
+  name: string;
+}
+
+interface JournalEntry {
+  id: string;
+  title: string;
+  content: string | null;
+  date_created: string;
+}
 
 interface Narrative {
   id: string;
@@ -14,6 +27,8 @@ interface Narrative {
   updated_at: string;
   required_tags?: string[];
   entry_count?: number;
+  journal_entries?: JournalEntry[];
+  tags?: Tag[];
 }
 
 interface NarrativesListProps {
@@ -53,24 +68,60 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
 
       if (narrativesError) throw narrativesError;
 
-      // Get the count of journal entries for each narrative
-      const narrativesWithEntryCounts = await Promise.all(
+      // Get journal entries and tags for each narrative
+      const narrativesWithEntries = await Promise.all(
         narrativesData.map(async (narrative) => {
-          const { count, error: countError } = await supabase
+          // First get the narrative_journal_entries associations
+          const { data: associationsData, error: associationsError } = await supabase
             .from('narrative_journal_entries')
-            .select('*', { count: 'exact', head: true })
-            .eq('narrative_id', narrative.id);
+            .select('journal_entry_id')
+            .eq('narrative_id', narrative.id)
+            .order('added_at', { ascending: false });
 
-          if (countError) {
-            console.error('Error fetching entry count:', countError);
-            return { ...narrative, entry_count: 0 };
+          if (associationsError) {
+            console.error('Error fetching associations:', associationsError);
+            return { ...narrative, journal_entries: [] };
           }
 
-          return { ...narrative, entry_count: count || 0 };
+          if (!associationsData || associationsData.length === 0) {
+            return { ...narrative, journal_entries: [], entry_count: 0 };
+          }
+
+          // Then get the actual journal entries
+          const { data: entriesData, error: entriesError } = await supabase
+            .from('journal_entries')
+            .select('id, title, content, date_created')
+            .in('id', associationsData.map(a => a.journal_entry_id))
+            .order('date_created', { ascending: false });
+
+          if (entriesError) {
+            console.error('Error fetching entries:', entriesError);
+            return { ...narrative, journal_entries: [] };
+          }
+
+          // Fetch tags if the narrative has required tags
+          let tags: Tag[] = [];
+          if (narrative.required_tags && narrative.required_tags.length > 0) {
+            const { data: tagData, error: tagError } = await supabase
+              .from('system_tags')
+              .select('id, name')
+              .in('id', narrative.required_tags);
+
+            if (!tagError && tagData) {
+              tags = tagData;
+            }
+          }
+
+          return {
+            ...narrative,
+            journal_entries: entriesData || [],
+            entry_count: entriesData?.length || 0,
+            tags
+          };
         })
       );
 
-      setNarratives(narrativesWithEntryCounts);
+      setNarratives(narrativesWithEntries);
     } catch (error: any) {
       console.error('Error fetching narratives:', error);
       setError(error.message || "Failed to load narratives");
@@ -87,36 +138,6 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
   useEffect(() => {
     fetchNarratives();
   }, [categoryId]);
-
-  const handleEditNarrative = (narrative: Narrative) => {
-    navigate(`/dashboard/narratives/create/${categoryId}?edit=${narrative.id}`);
-  };
-
-  const handleDeleteNarrative = async (narrativeId: string) => {
-    try {
-      const { error } = await supabase
-        .from('narratives')
-        .delete()
-        .eq('id', narrativeId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Narrative deleted successfully",
-      });
-
-      // Refresh the page to update both the list and the sidebar
-      window.location.reload();
-    } catch (error: any) {
-      console.error('Error deleting narrative:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete narrative",
-        variant: "destructive"
-      });
-    }
-  };
 
   if (isLoading) {
     return <div className="py-4 text-center">Loading narratives...</div>;
@@ -157,47 +178,40 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
           No narratives in this category yet. Create one to get started.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-6">
           {narratives.map((narrative) => (
             <Card key={narrative.id} className="overflow-hidden">
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-center">
-                  <CardTitle className="text-base">{narrative.title}</CardTitle>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteNarrative(narrative.id)}
-                      title="Delete narrative"
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditNarrative(narrative)}
-                      title="Edit narrative"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
+                  <div className="flex-1">
+                    <CardTitle className="text-base cursor-pointer hover:text-primary" onClick={() => navigate(`/dashboard/narratives/${narrative.id}`)}>
+                      {narrative.title}
+                    </CardTitle>
+                    {narrative.content && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                        {narrative.content}
+                      </p>
+                    )}
                   </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
+                <div className="space-y-4">
                   <div className="flex items-center text-muted-foreground text-sm">
                     <BookOpen className="h-4 w-4 mr-1" />
                     <span>{narrative.entry_count} journal entries</span>
                   </div>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="p-0 h-auto"
-                    onClick={() => navigate(`/dashboard/narratives/${narrative.id}`)}
-                  >
-                    View
-                  </Button>
+
+                  {narrative.tags && narrative.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {narrative.tags.map(tag => (
+                        <Badge key={tag.id} variant="secondary">
+                          {tag.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

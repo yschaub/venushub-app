@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import NarrativesList from '@/components/NarrativesList';
 
@@ -11,7 +11,6 @@ const Narratives: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -20,17 +19,17 @@ const Narratives: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         // First get the current user ID
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
+
         if (userError) throw userError;
-        
+
         if (!user) {
           setError("No authenticated user found");
           return;
         }
-        
+
         // Then fetch categories for this user only
         const { data: categoriesData, error: categoriesError } = await supabase
           .from('narrative_categories')
@@ -40,7 +39,7 @@ const Narratives: React.FC = () => {
           .order('name');
 
         if (categoriesError) throw categoriesError;
-        
+
         console.log("Fetched user categories:", categoriesData);
         setCategories(categoriesData);
       } catch (error: any) {
@@ -74,13 +73,6 @@ const Narratives: React.FC = () => {
     }
   };
 
-  const toggleCategoryExpand = (categoryId: string) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [categoryId]: !prev[categoryId]
-    }));
-  };
-
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading categories...</div>;
   }
@@ -97,8 +89,8 @@ const Narratives: React.FC = () => {
         <Card className="bg-muted/50">
           <CardContent className="py-10 text-center">
             <p className="text-destructive mb-2">Error: {error}</p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => window.location.reload()}
             >
               Retry
@@ -127,30 +119,27 @@ const Narratives: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-8">
           {categories.map((category) => (
-            <Card 
-              key={category.id} 
+            <Card
+              key={category.id}
               className="overflow-hidden"
             >
-              <CardHeader className="pb-3 cursor-pointer" onClick={() => toggleCategoryExpand(category.id)}>
+              <CardHeader>
                 <div className="flex items-center gap-2">
                   <div className="text-2xl">{getCategoryIcon(category.type)}</div>
-                  <CardTitle>{category.name}</CardTitle>
-                  {expandedCategories[category.id] ? 
-                    <ChevronDown className="h-4 w-4 ml-auto" /> : 
-                    <ChevronRight className="h-4 w-4 ml-auto" />
-                  }
+                  <div>
+                    <CardTitle>{category.name}</CardTitle>
+                    <CardDescription>{category.description}</CardDescription>
+                  </div>
                 </div>
               </CardHeader>
-              {expandedCategories[category.id] && (
-                <CardContent>
-                  <NarrativesList 
-                    categoryId={category.id} 
-                    categoryName={category.name} 
-                  />
-                </CardContent>
-              )}
+              <CardContent>
+                <NarrativesList
+                  categoryId={category.id}
+                  categoryName={category.name}
+                />
+              </CardContent>
             </Card>
           ))}
         </div>
