@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
@@ -7,108 +6,108 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 240 10% 3.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-
-    --primary: 210 100% 50%;
+    --background: 0 0% 100%;
+    --foreground: 222.22 47.37% 11.18%;
+    --muted: 220 14.29% 95.88%;
+    --muted-foreground: 215.29 19.32% 34.51%;
+    --popover: 0 6.67% 97.06%;
+    --popover-foreground: 222.22 47.37% 11.18%;
+    --card: 210 20% 98.04%;
+    --card-foreground: 222.22 47.37% 11.18%;
+    --border: 220 15.56% 90.89%;
+    --input: 216 12.2% 83.92%;
+    --primary: 331.29 100% 68.04%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 240 5.9% 90%;
-    --secondary-foreground: 240 5.9% 10%;
-
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-
-    --accent: 210 100% 50%;
-    --accent-foreground: 240 5.9% 10%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 10% 3.9%;
-
-    --radius: 0.75rem;
+    --secondary: 220 13.04% 90.98%;
+    --secondary-foreground: 222.22 47.37% 11.18%;
+    --accent: 216 12.2% 83.92%;
+    --accent-foreground: 222.22 47.37% 11.18%;
+    --destructive: 0 84.31% 60%;
+    --destructive-foreground: 0 0% 98.04%;
+    --ring: 331.18 100% 80%;
+    --chart-1: 331.29 100% 68.04%;
+    --chart-2: 220 13.04% 90.98%;
+    --chart-3: 216 12.2% 83.92%;
+    --chart-4: 220 13.04% 93.98%;
+    --chart-5: 331.29 103% 68.04%;
+    --radius: 0.5rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 210 100% 50%;
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: 213 30.3% 12.94%;
+    --foreground: 90 40% 98.04%;
+    --muted: 218.82 17.89% 18.63%;
+    --muted-foreground: 0 0% 82.35%;
+    --popover: 213.91 26.44% 17.06%;
+    --popover-foreground: 90 40% 98.04%;
+    --card: 213.91 26.44% 17.06%;
+    --card-foreground: 90 40% 98.04%;
+    --border: 213.75 13.15% 25.83%;
+    --input: 213.75 9.2% 34.12%;
+    --primary: 331.18 100% 55.1%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213.91 26.44% 17.06%;
+    --secondary-foreground: 90 40% 98.04%;
+    --accent: 220.91 39.29% 10.98%;
+    --accent-foreground: 90 40% 98.04%;
+    --destructive: 13.76 69.16% 44.51%;
+    --destructive-foreground: 0 0% 100%;
+    --ring: 331 100% 68%;
+    --chart-1: 331.18 100% 55.1%;
+    --chart-2: 213.91 26.44% 17.06%;
+    --chart-3: 220.91 39.29% 10.98%;
+    --chart-4: 213.91 26.44% 20.06%;
+    --chart-5: 331.18 103% 55.1%;
   }
 }
+
 
 @layer base {
   * {
     @apply border-border;
   }
-  
-  html, body {
+
+  html,
+  body {
     @apply antialiased;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   body {
     @apply bg-background text-foreground font-sans;
     font-family: 'Inter', sans-serif;
   }
-  
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-medium tracking-tight;
   }
-  
+
   h1 {
     @apply text-4xl sm:text-5xl md:text-6xl;
   }
-  
+
   h2 {
     @apply text-3xl sm:text-4xl;
   }
-  
+
   h3 {
     @apply text-2xl sm:text-3xl;
   }
-  
+
   img {
     @apply max-w-full h-auto;
   }
-  
+
   .transform-gpu {
     @apply transform-gpu;
   }
-  
+
   .glass {
     @apply bg-white/80 backdrop-blur-md;
   }
@@ -119,15 +118,13 @@
   .section {
     @apply py-12 md:py-24 px-4;
   }
-  
+
   .container-custom {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
-  
+
   .button-icon {
-    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors
-           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-           disabled:opacity-50 disabled:pointer-events-none ring-offset-background;
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background;
   }
 
   .card-hover {
