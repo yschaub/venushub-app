@@ -63,8 +63,6 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
     from: number;
     to: number;
   } | null>(null);
-  const [annotationContent, setAnnotationContent] = useState('');
-  const [showAnnotationForm, setShowAnnotationForm] = useState(false);
   const [entryDate, setEntryDate] = useState<Date | undefined>(
     eventDate ? new Date(eventDate) : new Date()
   );
@@ -184,35 +182,17 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
 
   const handleSelectionChange = (selection: { from: number; to: number; text: string } | null) => {
     setSelectedText(selection);
-    setShowAnnotationForm(!!selection);
   };
 
-  const handleAddAnnotation = () => {
-    if (!selectedText || !annotationContent.trim() || !editorRef.current) return;
-
-    try {
-      editorRef.current.addAnnotation(annotationContent);
-
-      const editorAnnotations = editorRef.current.getAnnotations();
-      const newAnnotations = convertAnnotations(editorAnnotations);
-
-      setAnnotations(newAnnotations);
-      setAnnotationContent('');
-      setSelectedText(null);
-      setShowAnnotationForm(false);
-
-      toast({
-        title: "Success",
-        description: "Annotation added successfully"
-      });
-    } catch (error) {
-      console.error('Error adding annotation:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add annotation",
-        variant: "destructive"
-      });
-    }
+  const handleAnnotationCreate = (annotation: AnnotationMark) => {
+    const newAnnotation: Annotation = {
+      id: annotation.id,
+      content: annotation.content,
+      selected_text: annotation.text,
+      created_at: new Date().toISOString(),
+      journal_entry_id: entryId
+    };
+    setAnnotations(prev => [...prev, newAnnotation]);
   };
 
   const handleDeleteAnnotation = async (annotationId: string) => {
@@ -281,7 +261,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             .eq('user_id', user.id)
             .eq('event_id', eventId)
             .maybeSingle();
-            
+
           if (checkError) {
             console.error('Error checking existing entry:', checkError);
           } else if (existingEntry) {
@@ -290,7 +270,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
               description: "You already have a journal entry for this event. Redirecting to edit it.",
               duration: 5000,
             });
-            
+
             setIsLoading(false);
             navigate(`/dashboard/journal/${existingEntry.id}/edit`);
             return;
@@ -311,7 +291,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
 
         if (entryError) {
           console.error('Error creating journal entry:', entryError);
-          
+
           toast({
             title: "Error",
             description: "Failed to create journal entry: " + entryError.message,
@@ -470,47 +450,12 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
                   content={content}
                   onChange={setContent}
                   onSelectionChange={handleSelectionChange}
+                  onAnnotationCreate={handleAnnotationCreate}
                   placeholder="Write your thoughts..."
                   className="p-3 min-h-[200px]"
                 />
               </div>
             </div>
-
-            {showAnnotationForm && selectedText && (
-              <div className="border p-4 rounded-md bg-muted/30">
-                <h3 className="text-sm font-medium mb-2">Add annotation for:</h3>
-                <p className="text-sm italic mb-2 bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded">
-                  "{selectedText.text}"
-                </p>
-                <Textarea
-                  value={annotationContent}
-                  onChange={(e) => setAnnotationContent(e.target.value)}
-                  placeholder="Write your annotation..."
-                  className="mb-2"
-                  rows={3}
-                />
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setShowAnnotationForm(false);
-                      setSelectedText(null);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleAddAnnotation}
-                  >
-                    Add Annotation
-                  </Button>
-                </div>
-              </div>
-            )}
 
             {tags.length > 0 && (
               <div className="space-y-2">

@@ -130,4 +130,57 @@
   .card-hover {
     @apply transition-all duration-300 ease-out-expo hover:shadow-lg hover:-translate-y-1;
   }
+
+  .prose-editor {
+    @apply relative;
+  }
+
+  .prose-editor .ProseMirror {
+    @apply min-h-[200px] outline-none;
+  }
+
+  .prose-editor .ProseMirror p {
+    @apply my-1;
+  }
+
+  .prose-editor .ProseMirror p:first-child {
+    @apply mt-0;
+  }
+
+  .prose-editor .ProseMirror p:last-child {
+    @apply mb-0;
+  }
+
+  .prose-editor .ProseMirror mark[data-type="annotation"] {
+    @apply bg-yellow-100 dark:bg-yellow-900/30 px-0.5 rounded cursor-pointer;
+  }
+
+  .annotation-popover {
+    animation: slideUpAndFade 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: auto;
+    user-select: none;
+  }
+
+  .prose-editor::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 40;
+  }
+
+  @keyframes slideUpAndFade {
+    from {
+      opacity: 0;
+      transform: translateY(2px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }

@@ -68,6 +68,7 @@ interface JournalEntry {
 interface Annotation {
   id: string;
   content: string;
+  selectedText?: string;
 }
 
 interface Narrative {
@@ -80,27 +81,29 @@ const parseContent = (content: string) => {
   const doc = parser.parseFromString(content, 'text/html');
   const annotations: Annotation[] = [];
 
-  // Find all spans with data-annotation attributes
-  doc.querySelectorAll('span[data-annotation-id]').forEach(span => {
-    const id = span.getAttribute('data-annotation-id') || '';
-    const annotationContent = span.getAttribute('data-annotation-content') || '';
+  // Find all marks with annotation data attributes
+  doc.querySelectorAll('mark[data-type="annotation"]').forEach(mark => {
+    const id = mark.getAttribute('data-id') || '';
+    const annotationContent = mark.getAttribute('data-content') || '';
+    const selectedText = mark.textContent || '';
 
-    // Create a new span with yellow background for the annotated text
-    const highlightSpan = doc.createElement('span');
-    highlightSpan.className = 'bg-yellow-100 dark:bg-yellow-900/30 rounded px-0.5';
-    highlightSpan.setAttribute('data-annotation-ref', id);
-    highlightSpan.textContent = span.textContent || '';
+    // Create a new mark element with the same styling
+    const highlightMark = doc.createElement('mark');
+    highlightMark.className = 'bg-yellow-100 dark:bg-yellow-900/30 px-0.5 rounded';
+    highlightMark.setAttribute('data-annotation-ref', id);
+    highlightMark.textContent = selectedText;
 
-    // Replace the original span with our highlighted version
-    span.replaceWith(highlightSpan);
+    // Replace the original mark with our highlighted version
+    mark.replaceWith(highlightMark);
 
     annotations.push({
       id,
-      content: annotationContent
+      content: annotationContent,
+      selectedText
     });
   });
 
-  // Get the cleaned content with our highlight spans
+  // Get the content with our highlight marks
   const cleanContent = doc.body.innerHTML;
 
   return {
@@ -631,7 +634,7 @@ const CalendarView = () => {
                                       className="rounded-lg border bg-card text-sm"
                                     >
                                       <div className="border-b bg-yellow-100 dark:bg-yellow-900/30 px-3 py-2">
-                                        {document.querySelector(`[data-annotation-ref="${annotation.id}"]`)?.textContent}
+                                        {annotation.selectedText}
                                       </div>
                                       <div className="px-3 py-2 space-y-2">
                                         <div>{annotation.content}</div>

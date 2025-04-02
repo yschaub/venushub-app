@@ -1,28 +1,16 @@
-
-import { Mark, markPasteRule } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Mark, mergeAttributes } from '@tiptap/core';
 import { v4 as uuidv4 } from 'uuid';
-
-export interface AnnotationOptions {
-  HTMLAttributes: Record<string, any>;
-}
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     annotation: {
-      /**
-       * Set an annotation mark
-       */
-      setAnnotation: (attributes?: { id?: string; content?: string }) => ReturnType;
-      /**
-       * Unset an annotation mark
-       */
+      setAnnotation: (attributes: { content: string }) => ReturnType;
       unsetAnnotation: () => ReturnType;
     };
   }
 }
 
-export const Annotation = Mark.create<AnnotationOptions>({
+export const Annotation = Mark.create({
   name: 'annotation',
 
   addOptions() {
@@ -35,29 +23,17 @@ export const Annotation = Mark.create<AnnotationOptions>({
     return {
       id: {
         default: null,
-        parseHTML: element => element.getAttribute('data-annotation-id'),
-        renderHTML: attributes => {
-          if (!attributes.id) {
-            return {};
-          }
-
-          return {
-            'data-annotation-id': attributes.id,
-          };
-        },
+        parseHTML: element => element.getAttribute('data-id'),
+        renderHTML: attributes => ({
+          'data-id': attributes.id,
+        }),
       },
       content: {
         default: null,
-        parseHTML: element => element.getAttribute('data-annotation-content'),
-        renderHTML: attributes => {
-          if (!attributes.content) {
-            return {};
-          }
-
-          return {
-            'data-annotation-content': attributes.content,
-          };
-        },
+        parseHTML: element => element.getAttribute('data-content'),
+        renderHTML: attributes => ({
+          'data-content': attributes.content,
+        }),
       },
     };
   },
@@ -65,40 +41,45 @@ export const Annotation = Mark.create<AnnotationOptions>({
   parseHTML() {
     return [
       {
-        tag: 'span[data-annotation-id]',
+        tag: 'mark[data-type="annotation"]',
       },
     ];
   },
 
   renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      {
-        ...this.options.HTMLAttributes,
-        ...HTMLAttributes,
-        class: 'annotation-mark bg-yellow-100 dark:bg-yellow-900/30 rounded',
-      },
-      0,
-    ];
+    return ['mark', mergeAttributes(
+      this.options.HTMLAttributes,
+      HTMLAttributes,
+      { 'data-type': 'annotation' }
+    ), 0];
   },
 
   addCommands() {
     return {
       setAnnotation:
-        attributes => ({ commands }) => {
-          const id = attributes?.id || uuidv4();
-          return commands.setMark(this.name, { id, content: attributes?.content || '' });
-        },
+        attributes =>
+          ({ commands, state }) => {
+            const { selection } = state;
+            const id = uuidv4();
+
+            // Don't apply annotation if there's no text selected
+            if (selection.empty) {
+              return false;
+            }
+
+            return commands.setMark(this.name, {
+              ...attributes,
+              id,
+            });
+          },
       unsetAnnotation:
-        () => ({ commands }) => {
-          return commands.unsetMark(this.name);
-        },
+        () =>
+          ({ commands }) => {
+            return commands.unsetMark(this.name);
+          },
     };
   },
 
-  addKeyboardShortcuts() {
-    return {
-      'Mod-Shift-a': () => this.editor.commands.toggleMark(this.name),
-    };
-  },
+  // Allow other marks to be applied alongside annotations
+  inclusive: false,
 });
