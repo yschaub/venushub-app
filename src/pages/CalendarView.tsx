@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth, addMonths, isSameMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface Event {
   id: string;
@@ -57,6 +58,52 @@ interface CalendarEvent extends BaseCalendarEvent {
   end_date?: string;
 }
 
+interface JournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  date_created: string;
+}
+
+interface Annotation {
+  id: string;
+  content: string;
+}
+
+const parseContent = (content: string) => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(content, 'text/html');
+  const annotations: Annotation[] = [];
+
+  // Find all spans with data-annotation attributes
+  doc.querySelectorAll('span[data-annotation-id]').forEach(span => {
+    const id = span.getAttribute('data-annotation-id') || '';
+    const annotationContent = span.getAttribute('data-annotation-content') || '';
+
+    // Create a new span with yellow background for the annotated text
+    const highlightSpan = doc.createElement('span');
+    highlightSpan.className = 'bg-yellow-100 dark:bg-yellow-900/30 rounded px-0.5';
+    highlightSpan.setAttribute('data-annotation-ref', id);
+    highlightSpan.textContent = span.textContent || '';
+
+    // Replace the original span with our highlighted version
+    span.replaceWith(highlightSpan);
+
+    annotations.push({
+      id,
+      content: annotationContent
+    });
+  });
+
+  // Get the cleaned content with our highlight spans
+  const cleanContent = doc.body.innerHTML;
+
+  return {
+    content: cleanContent,
+    annotations
+  };
+};
+
 const CalendarView = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +116,8 @@ const CalendarView = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [eventCache, setEventCache] = useState<EventCache>({});
   const [loadingMonth, setLoadingMonth] = useState(false);
+  const [journalEntry, setJournalEntry] = useState<JournalEntry | null>(null);
+  const [loadingJournal, setLoadingJournal] = useState(false);
   const navigate = useNavigate();
 
   const getMonthKey = useCallback((date: Date) => {
@@ -205,26 +254,25 @@ const CalendarView = () => {
     }
   }, [currentDate, eventCache, fetchEventsForMonth, getMonthKey, loading]);
 
-  const handleEventClick = async (event: CalendarEvent) => {
-    setSelectedEvent(event);
-    setIsSheetOpen(true);
-
-    await fetchRelatedEvents(event.id);
-
-    if (event.tags && event.tags.length > 0) {
-      const { data: tagsData, error: tagsError } = await supabase
-        .from('system_tags')
+  const fetchJournalEntry = async (journalId: string) => {
+    setLoadingJournal(true);
+    try {
+      const { data: entry, error } = await supabase
+        .from('journal_entries')
         .select('*')
-        .in('id', event.tags);
+        .eq('id', journalId)
+        .single();
 
-      if (tagsError) {
-        console.error('Error fetching event tags:', tagsError);
+      if (error) {
+        console.error('Error fetching journal entry:', error);
         return;
       }
 
-      setEventTags(tagsData || []);
-    } else {
-      setEventTags([]);
+      setJournalEntry(entry);
+    } catch (error) {
+      console.error('Error in fetchJournalEntry:', error);
+    } finally {
+      setLoadingJournal(false);
     }
   };
 
@@ -276,6 +324,35 @@ const CalendarView = () => {
       console.error('Error in fetchRelatedEvents:', error);
     } finally {
       setLoadingRelatedEvents(false);
+    }
+  };
+
+  const handleEventClick = async (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setIsSheetOpen(true);
+    setJournalEntry(null);
+
+    await fetchRelatedEvents(event.id);
+
+    if (event.tags && event.tags.length > 0) {
+      const { data: tagsData, error: tagsError } = await supabase
+        .from('system_tags')
+        .select('*')
+        .in('id', event.tags);
+
+      if (tagsError) {
+        console.error('Error fetching event tags:', tagsError);
+        return;
+      }
+
+      setEventTags(tagsData || []);
+    } else {
+      setEventTags([]);
+    }
+
+    // Fetch journal entry if it exists
+    if (event.hasJournal && event.journalId) {
+      await fetchJournalEntry(event.journalId);
     }
   };
 
@@ -368,27 +445,14 @@ const CalendarView = () => {
       </Calendar>
 
       <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-[1000px] max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex-none">
             <DialogTitle>{selectedEvent?.title}</DialogTitle>
             <DialogDescription className="space-y-3">
               {selectedEvent && (
                 <>
                   <p>
                     <strong>Date:</strong> {format(selectedEvent.start, 'PPP')}
-                  </p>
-                  {selectedEvent.start_date && selectedEvent.end_date && (
-                    <>
-                      <p>
-                        <strong>Start:</strong> {format(new Date(selectedEvent.start_date), 'PPP')}
-                      </p>
-                      <p>
-                        <strong>End:</strong> {format(new Date(selectedEvent.end_date), 'PPP')}
-                      </p>
-                    </>
-                  )}
-                  <p>
-                    <strong>Status:</strong> {selectedEvent.hasJournal ? 'Journal entry added' : 'No journal entry'}
                   </p>
 
                   {eventTags.length > 0 && (
@@ -418,62 +482,138 @@ const CalendarView = () => {
                       </div>
                     </div>
                   )}
+
+                  {!loadingRelatedEvents && relatedEvents.length > 0 && (
+                    <div className="mt-3">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+                        <Link className="h-3 w-3" />
+                        <span>Connected to:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-2 text-sm">
+                        {relatedEvents.map((event, index) => (
+                          <React.Fragment key={event.id}>
+                            <button
+                              className="text-primary hover:underline"
+                              onClick={() => {
+                                const calendarEvent = events.find(e => e.id === event.id);
+                                if (calendarEvent) {
+                                  setSelectedEvent(calendarEvent);
+                                  fetchRelatedEvents(event.id);
+                                }
+                              }}
+                            >
+                              {event.title}
+                            </button>
+                            {index < relatedEvents.length - 1 && <span className="text-muted-foreground">•</span>}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedEvent?.primary_event && (
-            <div className="mt-4">
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex items-center gap-1 w-full"
-                onClick={handleJournalAction}
-              >
-                <BookOpen className="h-3.5 w-3.5" />
-                {selectedEvent.hasJournal ? "View Journal" : "Journal About This"}
-              </Button>
-            </div>
-          )}
-
-          <div className="mt-6">
-            <h3 className="text-lg font-medium flex items-center gap-2">
-              <Link size={18} />
-              Connected Events
-            </h3>
-            <Separator className="my-2" />
-
-            {loadingRelatedEvents ? (
-              <p className="text-sm text-muted-foreground">Loading connected events...</p>
-            ) : relatedEvents.length > 0 ? (
-              <div className="space-y-3 mt-3">
-                {relatedEvents.map(event => (
-                  <div key={event.id} className="rounded-md border p-3">
-                    <h4 className="font-medium">{event.title}</h4>
-                    <div className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                      <CalendarIcon size={14} />
-                      <span>{format(new Date(event.start_date), 'MMM d')} - {format(new Date(event.end_date), 'MMM d, yyyy')}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 text-xs"
-                      onClick={() => {
-                        const calendarEvent = events.find(e => e.id === event.id);
-                        if (calendarEvent) {
-                          setSelectedEvent(calendarEvent);
-                          fetchRelatedEvents(event.id);
-                        }
-                      }}
-                    >
-                      View Details
-                    </Button>
+          <div className="flex-1 overflow-y-auto pr-6 -mr-6">
+            {selectedEvent?.primary_event && (
+              <div className="mt-4">
+                {selectedEvent.hasJournal ? (
+                  <div className="space-y-4">
+                    {loadingJournal ? (
+                      <div className="flex items-center justify-center py-4">
+                        <p className="text-sm text-muted-foreground">Loading journal entry...</p>
+                      </div>
+                    ) : journalEntry ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-medium flex items-center gap-2">
+                            <BookOpen className="h-4 w-4" />
+                            Journal Entry
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/dashboard/journal/${journalEntry.id}/edit`)}
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-[1fr,350px] gap-6">
+                          <div className="rounded-lg border bg-card">
+                            <div className="p-4 prose prose-sm max-w-none [&>div:first-child>p]:mt-0 [&>div:last-child>p]:mb-0">
+                              {journalEntry.content.split(/(<p>.*?<\/p>)/).filter(Boolean).map((paragraph, index) => {
+                                if (paragraph.startsWith('<p>')) {
+                                  const { content, annotations } = parseContent(paragraph);
+                                  return (
+                                    <div key={index}>
+                                      <p
+                                        dangerouslySetInnerHTML={{ __html: content }}
+                                      />
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })}
+                            </div>
+                          </div>
+                          <div className="rounded-lg border bg-card">
+                            <div className="border-b px-3 py-2 bg-muted/50">
+                              <div className="text-sm font-medium">
+                                Annotations ({journalEntry.content.split(/(<p>.*?<\/p>)/).filter(Boolean)
+                                  .reduce((count, paragraph) => {
+                                    if (paragraph.startsWith('<p>')) {
+                                      const { annotations } = parseContent(paragraph);
+                                      return count + annotations.length;
+                                    }
+                                    return count;
+                                  }, 0)})
+                              </div>
+                            </div>
+                            <div className="p-3 space-y-3">
+                              {journalEntry.content.split(/(<p>.*?<\/p>)/).filter(Boolean).map((paragraph, index) => {
+                                if (paragraph.startsWith('<p>')) {
+                                  const { annotations } = parseContent(paragraph);
+                                  return annotations.map((annotation) => (
+                                    <div
+                                      key={annotation.id}
+                                      className="rounded-lg border bg-card text-sm"
+                                    >
+                                      <div className="border-b bg-yellow-100 dark:bg-yellow-900/30 px-3 py-2">
+                                        {document.querySelector(`[data-annotation-ref="${annotation.id}"]`)?.textContent}
+                                      </div>
+                                      <div className="px-3 py-2 space-y-2">
+                                        <div>{annotation.content}</div>
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                          <div>9 minutes ago</div>
+                                          <button className="opacity-0">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ));
+                                }
+                                return null;
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
                   </div>
-                ))}
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-1 w-full"
+                    onClick={handleJournalAction}
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Journal About This
+                  </Button>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No connected events found</p>
             )}
           </div>
         </DialogContent>
