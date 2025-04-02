@@ -9,6 +9,7 @@ import EditJournalEntry from '@/pages/EditJournalEntry';
 import Narratives from '@/pages/Narratives';
 import CalendarView from '@/pages/CalendarView';
 import NarrativeShow from '@/pages/NarrativeShow';
+import CreateNarrative from '@/pages/CreateNarrative';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -156,6 +157,7 @@ const Dashboard: React.FC = () => {
                 <Route path="/" element={<CalendarView />} />
                 <Route path="/calendar" element={<CalendarView />} />
                 <Route path="/narratives" element={<Narratives />} />
+                <Route path="/narratives/create/:categoryId" element={<CreateNarrative />} />
                 <Route path="/narratives/:id" element={<NarrativeShow />} />
                 <Route path="/journal" element={<JournalEntries />} />
                 <Route path="/journal/create" element={<CreateJournalEntry />} />

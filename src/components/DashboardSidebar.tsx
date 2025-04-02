@@ -16,7 +16,6 @@ import {
   SidebarMenuSubButton
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import CreateNarrativeDialog from './CreateNarrativeDialog';
 
 interface DashboardSidebarProps {
   userEmail: string | null;
@@ -39,8 +38,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
   const [categories, setCategories] = useState<NarrativeCategory[]>([]);
   const [narratives, setNarratives] = useState<Narrative[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<{ id: string; name: string } | null>(null);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -131,8 +128,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
   };
 
   const handleCreateNarrative = (categoryId: string, categoryName: string) => {
-    setSelectedCategory({ id: categoryId, name: categoryName });
-    setCreateDialogOpen(true);
+    navigate(`/dashboard/narratives/create/${categoryId}`);
   };
 
   return (
@@ -241,16 +237,6 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
           </Button>
         </div>
       </SidebarFooter>
-
-      {selectedCategory && (
-        <CreateNarrativeDialog
-          open={createDialogOpen}
-          onOpenChange={setCreateDialogOpen}
-          categoryId={selectedCategory.id}
-          categoryName={selectedCategory.name}
-          onNarrativeCreated={fetchNarratives}
-        />
-      )}
     </Sidebar>
   );
 };

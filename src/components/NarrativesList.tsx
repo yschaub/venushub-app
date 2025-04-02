@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -6,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, BookOpen, Edit, Trash2 } from 'lucide-react';
-import CreateNarrativeDialog from './CreateNarrativeDialog';
 
 interface Narrative {
   id: string;
@@ -28,26 +26,23 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
   const [narratives, setNarratives] = useState<Narrative[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedNarrative, setSelectedNarrative] = useState<Narrative | null>(null);
   const { toast } = useToast();
 
   const fetchNarratives = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
+
       if (userError) throw userError;
-      
+
       if (!user) {
         setError("No authenticated user found");
         return;
       }
-      
+
       // Fetch narratives for this category
       const { data: narrativesData, error: narrativesError } = await supabase
         .from('narratives')
@@ -55,9 +50,9 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
         .eq('category_id', categoryId)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      
+
       if (narrativesError) throw narrativesError;
-      
+
       // Get the count of journal entries for each narrative
       const narrativesWithEntryCounts = await Promise.all(
         narrativesData.map(async (narrative) => {
@@ -65,16 +60,16 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
             .from('narrative_journal_entries')
             .select('*', { count: 'exact', head: true })
             .eq('narrative_id', narrative.id);
-          
+
           if (countError) {
             console.error('Error fetching entry count:', countError);
             return { ...narrative, entry_count: 0 };
           }
-          
+
           return { ...narrative, entry_count: count || 0 };
         })
       );
-      
+
       setNarratives(narrativesWithEntryCounts);
     } catch (error: any) {
       console.error('Error fetching narratives:', error);
@@ -94,8 +89,7 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
   }, [categoryId]);
 
   const handleEditNarrative = (narrative: Narrative) => {
-    setSelectedNarrative(narrative);
-    setEditDialogOpen(true);
+    navigate(`/dashboard/narratives/create/${categoryId}?edit=${narrative.id}`);
   };
 
   const handleDeleteNarrative = async (narrativeId: string) => {
@@ -104,14 +98,14 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
         .from('narratives')
         .delete()
         .eq('id', narrativeId);
-      
+
       if (error) throw error;
-      
+
       toast({
         title: "Success",
         description: "Narrative deleted successfully",
       });
-      
+
       // Refresh the page to update both the list and the sidebar
       window.location.reload();
     } catch (error: any) {
@@ -132,8 +126,8 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
     return (
       <div className="py-4">
         <p className="text-destructive mb-2">Error: {error}</p>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={fetchNarratives}
           size="sm"
         >
@@ -147,17 +141,17 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
     <div>
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-lg font-medium">Narratives</h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setCreateDialogOpen(true)}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate(`/dashboard/narratives/create/${categoryId}`)}
           className="flex items-center gap-1"
         >
           <PlusCircle className="h-4 w-4" />
           New Narrative
         </Button>
       </div>
-      
+
       {narratives.length === 0 ? (
         <div className="text-sm text-muted-foreground text-center py-4">
           No narratives in this category yet. Create one to get started.
@@ -210,23 +204,6 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
           ))}
         </div>
       )}
-      
-      <CreateNarrativeDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        categoryId={categoryId}
-        categoryName={categoryName}
-        onNarrativeCreated={fetchNarratives}
-      />
-      
-      <CreateNarrativeDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        categoryId={categoryId}
-        categoryName={categoryName}
-        narrativeToEdit={selectedNarrative}
-        onNarrativeCreated={fetchNarratives}
-      />
     </div>
   );
 };

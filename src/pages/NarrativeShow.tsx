@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { ChevronLeft, BookOpen, Edit, Tag, Trash2 } from 'lucide-react';
-import CreateNarrativeDialog from '@/components/CreateNarrativeDialog';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -40,7 +38,6 @@ const NarrativeShow: React.FC = () => {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [narrativeTags, setNarrativeTags] = useState<Tag[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -92,35 +89,35 @@ const NarrativeShow: React.FC = () => {
                         .from('system_tags')
                         .select('id, name')
                         .in('id', narrative.required_tags);
-                    
+
                     if (tagError) throw tagError;
                     setNarrativeTags(tagData || []);
-                    
+
                     // First, get all journal entries for this user
                     const { data: userEntriesData, error: userEntriesError } = await supabase
                         .from('journal_entries')
                         .select('id, title, content, date_created')
                         .eq('user_id', user.id);
-                    
+
                     if (userEntriesError) throw userEntriesError;
-                    
+
                     if (!userEntriesData || userEntriesData.length === 0) {
                         setEntries([]);
                         setIsLoading(false);
                         return;
                     }
-                    
+
                     // Get tags for all of the user's entries
                     const { data: entryTagsData, error: entryTagsError } = await supabase
                         .from('journal_entry_tags')
                         .select('journal_entry_id, tag_id')
                         .in('journal_entry_id', userEntriesData.map(entry => entry.id));
-                    
+
                     if (entryTagsError) throw entryTagsError;
-                    
+
                     // Group tags by entry id
                     const entryTagsMap = new Map<string, Set<string>>();
-                    
+
                     if (entryTagsData) {
                         entryTagsData.forEach(item => {
                             if (!entryTagsMap.has(item.journal_entry_id)) {
@@ -129,20 +126,20 @@ const NarrativeShow: React.FC = () => {
                             entryTagsMap.get(item.journal_entry_id)?.add(item.tag_id);
                         });
                     }
-                    
+
                     // Filter entries that have ALL the required tags (AND logic)
                     const matchingEntries = userEntriesData.filter(entry => {
                         const entryTags = entryTagsMap.get(entry.id);
                         if (!entryTags) return false;
-                        
+
                         // Check if entry has ALL required tags
                         return narrative.required_tags!.every(tagId => entryTags.has(tagId));
                     });
-                    
+
                     // Sort entries by date_created
                     const sortedEntries = matchingEntries
                         .sort((a, b) => new Date(b.date_created).getTime() - new Date(a.date_created).getTime());
-                    
+
                     setEntries(sortedEntries);
                 } else {
                     setEntries([]);
@@ -163,7 +160,7 @@ const NarrativeShow: React.FC = () => {
         if (id) {
             fetchNarrativeAndEntries();
         }
-    }, [id, toast, editDialogOpen]);
+    }, [id, toast]);
 
     const getCategoryIcon = (type: string) => {
         switch (type) {
@@ -182,21 +179,21 @@ const NarrativeShow: React.FC = () => {
 
     const handleDeleteNarrative = async () => {
         if (!id) return;
-        
+
         try {
             // Delete the narrative
             const { error } = await supabase
                 .from('narratives')
                 .delete()
                 .eq('id', id);
-            
+
             if (error) throw error;
-            
+
             toast({
                 title: "Success",
                 description: "Narrative deleted successfully",
             });
-            
+
             // Navigate back to narratives page and refresh the page to update the sidebar
             navigate('/dashboard/narratives');
             window.location.reload();
@@ -269,7 +266,7 @@ const NarrativeShow: React.FC = () => {
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setEditDialogOpen(true)}
+                            onClick={() => navigate(`/dashboard/narratives/create/${narrative.category_id}?edit=${narrative.id}`)}
                             className="flex items-center gap-1"
                         >
                             <Edit className="h-4 w-4" />
@@ -280,7 +277,7 @@ const NarrativeShow: React.FC = () => {
                 <p className="text-muted-foreground">
                     Category: {narrative.category_name}
                 </p>
-                
+
                 {narrativeTags.length > 0 && (
                     <div className="mt-3">
                         <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
@@ -339,19 +336,6 @@ const NarrativeShow: React.FC = () => {
                 </div>
             )}
 
-            <CreateNarrativeDialog
-                open={editDialogOpen}
-                onOpenChange={setEditDialogOpen}
-                categoryId={narrative.category_id}
-                categoryName={narrative.category_name}
-                narrativeToEdit={{
-                    id: narrative.id,
-                    title: narrative.title,
-                    required_tags: narrative.required_tags
-                }}
-                onNarrativeCreated={() => {}}
-            />
-            
             {/* Confirmation Dialog for Delete */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogContent>
@@ -365,8 +349,8 @@ const NarrativeShow: React.FC = () => {
                         <DialogClose asChild>
                             <Button variant="outline">Cancel</Button>
                         </DialogClose>
-                        <Button 
-                            variant="destructive" 
+                        <Button
+                            variant="destructive"
                             onClick={handleDeleteNarrative}
                         >
                             Delete
