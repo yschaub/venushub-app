@@ -15,10 +15,8 @@ const Dashboard: React.FC = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Function to automatically associate journal entries with narratives based on tags
   const associateEntriesWithNarratives = async (userId: string) => {
     try {
-      // Fetch all narratives with required tags
       const { data: narratives, error: narrativesError } = await supabase
         .from('narratives')
         .select('id, required_tags')
@@ -31,8 +29,6 @@ const Dashboard: React.FC = () => {
       for (const narrative of narratives) {
         if (!narrative.required_tags || narrative.required_tags.length === 0) continue;
 
-        // Find journal entries that have ALL the required tags for this narrative
-        // Convert required_tags to a simple string[] to avoid TypeScript recursion
         const requiredTags = narrative.required_tags as unknown as string[];
 
         if (!requiredTags.length) continue;
@@ -47,7 +43,6 @@ const Dashboard: React.FC = () => {
           continue;
         }
 
-        // Group entries by journal_entry_id and count how many tags they have
         const entryCounts: Record<string, string[]> = {};
         journalEntryTagsData.forEach(item => {
           if (!entryCounts[item.journal_entry_id]) {
@@ -56,17 +51,14 @@ const Dashboard: React.FC = () => {
           entryCounts[item.journal_entry_id].push(item.tag_id);
         });
 
-        // Find entries that have ALL required tags
         const matchingEntryIds = Object.entries(entryCounts)
           .filter(([_, tags]) => {
-            // Check if this entry has ALL the required tags
             return requiredTags.every(tagId => tags.includes(tagId));
           })
           .map(([entryId]) => entryId);
 
         if (matchingEntryIds.length === 0) continue;
 
-        // Find which entries are already associated with this narrative
         const { data: existingAssociations, error: existingError } = await supabase
           .from('narrative_journal_entries')
           .select('journal_entry_id')
@@ -80,12 +72,10 @@ const Dashboard: React.FC = () => {
 
         const existingEntryIds = existingAssociations.map(item => item.journal_entry_id);
 
-        // Find entries that need to be added
         const entriesToAdd = matchingEntryIds.filter(id => !existingEntryIds.includes(id));
 
         if (entriesToAdd.length === 0) continue;
 
-        // Add new associations
         const associationsToInsert = entriesToAdd.map(entryId => ({
           narrative_id: narrative.id,
           journal_entry_id: entryId
@@ -117,7 +107,6 @@ const Dashboard: React.FC = () => {
       }
       setUserEmail(user.email);
 
-      // Associate journal entries with narratives based on tags
       await associateEntriesWithNarratives(user.id);
 
       setLoading(false);

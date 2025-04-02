@@ -1,3 +1,5 @@
+import { VariantProps } from 'class-variance-authority';
+import { monthEventVariants } from './calendar'; // Adjust this import path if needed
 
 export type CalendarEvent = {
     id: string;
