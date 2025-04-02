@@ -70,6 +70,11 @@ interface Annotation {
   content: string;
 }
 
+interface Narrative {
+  id: string;
+  title: string;
+}
+
 const parseContent = (content: string) => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(content, 'text/html');
@@ -118,6 +123,7 @@ const CalendarView = () => {
   const [loadingMonth, setLoadingMonth] = useState(false);
   const [journalEntry, setJournalEntry] = useState<JournalEntry | null>(null);
   const [loadingJournal, setLoadingJournal] = useState(false);
+  const [journalNarratives, setJournalNarratives] = useState<Narrative[]>([]);
   const navigate = useNavigate();
 
   const getMonthKey = useCallback((date: Date) => {
@@ -256,6 +262,7 @@ const CalendarView = () => {
 
   const fetchJournalEntry = async (journalId: string) => {
     setLoadingJournal(true);
+    setJournalNarratives([]);
     try {
       const { data: entry, error } = await supabase
         .from('journal_entries')
@@ -269,6 +276,28 @@ const CalendarView = () => {
       }
 
       setJournalEntry(entry);
+
+      // Fetch narratives that this journal entry belongs to
+      const { data: narrativeEntries, error: narrativesError } = await supabase
+        .from('narrative_journal_entries')
+        .select(`
+          narrative:narratives (
+            id,
+            title
+          )
+        `)
+        .eq('journal_entry_id', journalId);
+
+      if (narrativesError) {
+        console.error('Error fetching narratives:', narrativesError);
+        return;
+      }
+
+      const narratives = narrativeEntries
+        ?.map(entry => entry.narrative)
+        .filter((narrative): narrative is Narrative => narrative !== null);
+
+      setJournalNarratives(narratives || []);
     } catch (error) {
       console.error('Error in fetchJournalEntry:', error);
     } finally {
@@ -505,6 +534,28 @@ const CalendarView = () => {
                               {event.title}
                             </button>
                             {index < relatedEvents.length - 1 && <span className="text-muted-foreground">•</span>}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {journalNarratives.length > 0 && (
+                    <div className="mt-3">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+                        <BookOpen className="h-3 w-3" />
+                        <span>Part of narratives:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-2 text-sm">
+                        {journalNarratives.map((narrative, index) => (
+                          <React.Fragment key={narrative.id}>
+                            <button
+                              className="text-primary hover:underline"
+                              onClick={() => navigate(`/dashboard/narratives/${narrative.id}`)}
+                            >
+                              {narrative.title}
+                            </button>
+                            {index < journalNarratives.length - 1 && <span className="text-muted-foreground">•</span>}
                           </React.Fragment>
                         ))}
                       </div>
