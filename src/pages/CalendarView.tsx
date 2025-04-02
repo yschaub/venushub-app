@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link, BookOpen, Tag } from 'lucide-react';
@@ -29,6 +30,7 @@ interface Event {
   title: string;
   start_date: string;
   end_date: string;
+  date: string; // Added date field
   primary_event: boolean;
   tags: string[];
   hasJournal?: boolean;
@@ -101,12 +103,12 @@ const CalendarView = () => {
 
       console.log(`Fetching events from ${format(firstDay, 'yyyy-MM-dd')} to ${format(lastDay, 'yyyy-MM-dd')}`);
 
+      // Modified query to use date field range instead of start_date
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
-        .or(`start_date.gte.${format(firstDay, 'yyyy-MM-dd')},end_date.gte.${format(firstDay, 'yyyy-MM-dd')}`)
-        .or(`start_date.lte.${format(lastDay, 'yyyy-MM-dd')},end_date.lte.${format(lastDay, 'yyyy-MM-dd')}`)
-        .order('start_date', { ascending: true });
+        .or(`date.gte.${format(firstDay, 'yyyy-MM-dd')},date.lte.${format(lastDay, 'yyyy-MM-dd')}`)
+        .order('date', { ascending: true });
 
       if (eventsError) {
         console.error('Error fetching events:', eventsError);
@@ -136,11 +138,15 @@ const CalendarView = () => {
         const hasJournal = eventJournalMap.has(event.id);
         const journalId = eventJournalMap.get(event.id);
 
+        // Use date field for calendar display instead of start_date
         return {
           id: event.id,
           title: event.title,
-          start: new Date(event.start_date),
+          start: new Date(event.date), // Changed from start_date to date
           end: new Date(event.end_date),
+          eventDate: event.date, // Store original date string
+          startDate: event.start_date, // Store original start_date
+          endDate: event.end_date, // Store original end_date
           hasJournal: hasJournal,
           journalId: journalId,
           tags: event.tags,
@@ -290,7 +296,7 @@ const CalendarView = () => {
             id: selectedEvent.id,
             title: selectedEvent.title,
             tags: selectedEvent.tags || [],
-            date: format(selectedEvent.start, 'yyyy-MM-dd')
+            date: selectedEvent.eventDate || format(selectedEvent.start, 'yyyy-MM-dd') // Use saved eventDate if available
           }
         }
       });
