@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChevronLeft, ChevronRight, BookOpen, Link, Tag } from 'lucide-react';
@@ -43,6 +42,7 @@ import {
   useJournalNarratives 
 } from '@/hooks/useJournalEntry';
 import { useRelatedEvents } from '@/hooks/useRelatedEvents';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Annotation {
   id: string;
@@ -56,14 +56,12 @@ const parseContent = (content: string) => {
   const doc = parser.parseFromString(content, 'text/html');
   const annotations: Annotation[] = [];
 
-  // Find all marks with annotation data attributes
   doc.querySelectorAll('mark[data-type="annotation"]').forEach(mark => {
     const id = mark.getAttribute('data-id') || '';
     const annotationContent = mark.getAttribute('data-content') || '';
     const selectedText = mark.textContent || '';
     const createdAt = mark.getAttribute('data-created-at') || '';
 
-    // Create a new mark element with tooltip trigger
     const highlightMark = doc.createElement('mark');
     highlightMark.className = 'bg-yellow-100 dark:bg-yellow-900/30 px-0.5 rounded cursor-help hover:bg-yellow-200 dark:hover:bg-yellow-800/50 transition-colors';
     highlightMark.setAttribute('data-annotation-ref', id);
@@ -71,7 +69,6 @@ const parseContent = (content: string) => {
     highlightMark.setAttribute('data-created-at', createdAt);
     highlightMark.textContent = selectedText;
 
-    // Replace the original mark with our highlighted version
     mark.replaceWith(highlightMark);
 
     annotations.push({
@@ -82,7 +79,6 @@ const parseContent = (content: string) => {
     });
   });
 
-  // Get the content with our highlight marks
   const cleanContent = doc.body.innerHTML;
 
   return {
@@ -105,7 +101,6 @@ const CalendarView = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Using the custom hooks
   const { 
     events, 
     isLoading: loadingEvents, 
@@ -127,7 +122,6 @@ const CalendarView = () => {
     isLoading: loadingNarratives 
   } = useJournalNarratives(selectedEvent?.journalId);
 
-  // Determine the tag IDs to fetch
   const tagIds = selectedEvent
     ? selectedEvent.hasJournal && journalEntry?.journal_entry_tags
       ? journalEntry.journal_entry_tags.map(t => t.tag_id)
@@ -136,7 +130,6 @@ const CalendarView = () => {
 
   const { data: eventTags = [] } = useJournalTags(tagIds);
 
-  // Prefetch adjacent months when current month data is loaded
   useEffect(() => {
     if (!loadingEvents) {
       prefetchAdjacentMonths();
@@ -218,23 +211,19 @@ const CalendarView = () => {
     };
   }, [hoveredAnnotation]);
 
-  // Add effect to handle return navigation
   useEffect(() => {
     const openEventId = location.state?.openEventId;
     if (!openEventId || loadingEvents) return;
 
-    // Find the event in the current month
     const eventToOpen = events.find(event => event.id === openEventId);
 
     if (eventToOpen) {
       handleEventClick(eventToOpen);
-      // Clear the state after opening the event
       navigate(location.pathname, {
         replace: true,
         state: {}
       });
     } else {
-      // If event not found in current month, fetch it to get its date
       const fetchEventDate = async () => {
         try {
           const { data: event, error } = await supabase
@@ -248,7 +237,6 @@ const CalendarView = () => {
             return;
           }
 
-          // Set the calendar to the event's month
           const eventDate = new Date(event.date);
           if (!isSameMonth(eventDate, currentDate)) {
             setCurrentDate(eventDate);
@@ -317,7 +305,6 @@ const CalendarView = () => {
                     {eventTags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {eventTags.map((tag) => {
-                          // If this is a journal entry, check if the tag is also in the event
                           const isEventTag = selectedEvent?.hasJournal && selectedEvent.tags?.includes(tag.id);
                           return (
                             <Badge

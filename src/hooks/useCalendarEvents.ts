@@ -107,9 +107,10 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
     queryFn: () => fetchEventsForMonth(date, userId),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!userId,
-    onError: (error) => {
-      toast.error("Failed to load events");
-      console.error(error);
+    meta: {
+      onError: () => {
+        toast.error("Failed to load events");
+      }
     }
   });
 
