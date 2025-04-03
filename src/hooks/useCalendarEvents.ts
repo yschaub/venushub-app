@@ -119,7 +119,7 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
   const query = useQuery({
     queryKey: ['calendar-events', monthKey, userId],
     queryFn: () => fetchEventsForMonth(date, userId),
-    staleTime: 0,
+    staleTime: 0, // Always treat data as stale to ensure fresh data
     gcTime: 0, // Don't keep old data in cache
     retry: 1, // Only retry once to avoid infinite loading
     enabled: !!userId,
@@ -159,6 +159,10 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
 
   // Function to manually invalidate calendar data
   const refreshEvents = () => {
+    // Force invalidate the current month
+    queryClient.invalidateQueries({ queryKey: ['calendar-events', monthKey, userId] });
+    
+    // Invalidate all calendar events to ensure fresh data
     queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
   };
 

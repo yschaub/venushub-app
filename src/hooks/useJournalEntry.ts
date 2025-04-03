@@ -1,3 +1,4 @@
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -113,7 +114,7 @@ export const useJournalTags = (tagIds: string[] = []) => {
     queryKey: ['journal-tags', tagIds],
     queryFn: () => fetchJournalTags(tagIds),
     enabled: tagIds.length > 0,
-    staleTime: 10000, // 10 seconds
+    staleTime: 0, // Always get fresh data
   });
 };
 
@@ -143,7 +144,7 @@ export const useJournalNarratives = (journalId: string | undefined) => {
     queryKey: ['journal-narratives', journalId],
     queryFn: () => fetchJournalNarratives(journalId!),
     enabled: !!journalId,
-    staleTime: 10000, // 10 seconds
+    staleTime: 0, // Always get fresh data
   });
 };
 

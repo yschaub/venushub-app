@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -119,6 +118,7 @@ const CreateJournalEntry: React.FC = () => {
     }
   };
 
+  
   return (
     <div className="p-6">
       <div className="mb-6">

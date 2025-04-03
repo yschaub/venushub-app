@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChevronLeft, ChevronRight, BookOpen, Link } from 'lucide-react';
@@ -139,56 +138,63 @@ const CalendarView = () => {
 
   const { data: eventTags = [] } = useJournalTags(tagIds);
 
-  // Initial setup and immediate data fetch on component mount
+  // Immediate data load when user is authenticated
   useEffect(() => {
-    if (user?.id && !initialLoadDone) {
+    if (user?.id) {
       console.log("Initial calendar data loading");
       
-      // Clear any stale data and force a fresh fetch
-      queryClient.removeQueries({ queryKey: ['calendar-events'] });
+      // Force a fresh data fetch for the current month
+      const monthKey = getMonthKey(currentDate);
+      queryClient.removeQueries({ 
+        queryKey: ['calendar-events', monthKey, user.id]
+      });
       refreshEvents();
       
-      // Invalidate all journal queries when viewing the calendar
+      // Also ensure all journal data is fresh
       invalidateJournalQueries(queryClient);
-      
-      // Mark initial load as complete
-      setInitialLoadDone(true);
     }
-  }, [user?.id, initialLoadDone, queryClient, refreshEvents]);
+  }, [user?.id, currentDate, queryClient, refreshEvents]);
 
-  // Handle prefetching when month changes
+  // When component mounts, make sure we've loaded initial data
   useEffect(() => {
-    if (user?.id && !isLoadingEvents) {
-      prefetchAdjacentMonths();
+    if (user?.id && !initialLoadDone && !isLoadingEvents) {
+      // If we have a user and events aren't loading, mark initial load as done
+      setInitialLoadDone(true);
+      
+      // Prefetch adjacent months for smoother navigation
+      if (events.length > 0) {
+        prefetchAdjacentMonths();
+      }
     }
-  }, [currentDate, isLoadingEvents, prefetchAdjacentMonths, user?.id]);
+  }, [user?.id, initialLoadDone, isLoadingEvents, events, prefetchAdjacentMonths]);
 
-  // Check for return from journal create/edit page
+  // Check for return from journal create/edit page and refresh data
   useEffect(() => {
     const returnInfo = location.state?.returnTo;
     if (returnInfo && returnInfo.path === '/dashboard/calendar') {
       console.log("Returning from journal page, refreshing data");
       
-      // Force refresh of all calendar data
+      // Force refresh all calendar data
       refreshEvents();
       
       // If there's an eventId specified, open the modal for it
       if (returnInfo.eventId) {
-        // Need to find the event after refresh
+        // Short timeout to allow data to refresh
         const timer = setTimeout(() => {
-          // Re-fetch all events for the current month to ensure we have fresh data
+          // Reload the current month's events
           const monthKey = getMonthKey(currentDate);
           queryClient.invalidateQueries({ 
             queryKey: ['calendar-events', monthKey, user?.id] 
           });
           
+          // Find the event in our refreshed data
           const returnedEvent = events.find(event => event.id === returnInfo.eventId);
           if (returnedEvent) {
             console.log("Opening event from return navigation:", returnedEvent.id);
             setSelectedEvent(returnedEvent);
             setIsSheetOpen(true);
             
-            // If the event has a journal, refetch it
+            // Refresh journal data if this event has a journal
             if (returnedEvent.journalId) {
               console.log("Refetching journal for event:", returnedEvent.id);
               queryClient.invalidateQueries({ 
@@ -198,9 +204,9 @@ const CalendarView = () => {
             }
           }
           
-          // Clear the return state
+          // Clear the return state to prevent reprocessing
           navigate(location.pathname, { replace: true, state: {} });
-        }, 500); // Give enough time for events to load
+        }, 300); // Short timeout to allow data loading
         
         return () => clearTimeout(timer);
       }
@@ -210,7 +216,7 @@ const CalendarView = () => {
   const handleEventClick = (event: CalendarEvent) => {
     console.log("Event clicked:", event.id);
     
-    // If the event has a journal ID, ensure we have fresh journal data
+    // Ensure we have fresh journal data if this event has a journal
     if (event.journalId) {
       queryClient.invalidateQueries({ queryKey: ['journal-entry', event.journalId] });
     }
