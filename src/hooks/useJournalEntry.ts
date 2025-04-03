@@ -1,5 +1,5 @@
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Annotation {
@@ -16,6 +16,7 @@ export interface JournalEntry {
   date_created: string;
   annotations?: Annotation[];
   journal_entry_tags?: { tag_id: string }[];
+  event_id?: string;
 }
 
 export interface SystemTag {
@@ -72,11 +73,13 @@ export const fetchJournalEntry = async (journalId: string) => {
 };
 
 export const useJournalEntry = (journalId: string | undefined) => {
+  const queryClient = useQueryClient();
+  
   return useQuery({
     queryKey: ['journal-entry', journalId],
     queryFn: () => fetchJournalEntry(journalId!),
     enabled: !!journalId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // Always refetch when needed
   });
 };
 
@@ -101,7 +104,7 @@ export const useJournalTags = (tagIds: string[] = []) => {
     queryKey: ['journal-tags', tagIds],
     queryFn: () => fetchJournalTags(tagIds),
     enabled: tagIds.length > 0,
-    staleTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 10000, // 10 seconds
   });
 };
 
@@ -131,6 +134,20 @@ export const useJournalNarratives = (journalId: string | undefined) => {
     queryKey: ['journal-narratives', journalId],
     queryFn: () => fetchJournalNarratives(journalId!),
     enabled: !!journalId,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10000, // 10 seconds
   });
+};
+
+// New utility function to invalidate all journal-related queries
+export const invalidateJournalQueries = (queryClient: any, eventId?: string) => {
+  // Invalidate all journal entries
+  queryClient.invalidateQueries({ queryKey: ['journal-entry'] });
+  
+  // Invalidate all calendar events (which include journal data)
+  queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+  
+  // If we have a specific event ID, also invalidate related events for it
+  if (eventId) {
+    queryClient.invalidateQueries({ queryKey: ['related-events', eventId] });
+  }
 };

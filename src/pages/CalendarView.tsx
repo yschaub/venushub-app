@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { ChevronLeft, ChevronRight, BookOpen, Link, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, Link } from 'lucide-react';
 import {
   Calendar,
   CalendarCurrentDate,
@@ -9,7 +9,6 @@ import {
   CalendarNextTrigger,
   CalendarPrevTrigger,
   CalendarTodayTrigger,
-  CalendarEvent as BaseCalendarEvent,
 } from '@/components/ui/full-calendar';
 import {
   Dialog,
@@ -40,10 +39,12 @@ import {
 import { 
   useJournalEntry, 
   useJournalTags, 
-  useJournalNarratives 
+  useJournalNarratives,
+  invalidateJournalQueries 
 } from '@/hooks/useJournalEntry';
 import { useRelatedEvents } from '@/hooks/useRelatedEvents';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Annotation {
   id: string;
@@ -101,16 +102,19 @@ const CalendarView = () => {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const { 
     events, 
     isLoading: loadingEvents, 
-    prefetchAdjacentMonths 
+    prefetchAdjacentMonths,
+    refreshEvents
   } = useCalendarEvents(currentDate, user?.id || null);
 
   const { 
     data: journalEntry, 
-    isLoading: loadingJournal 
+    isLoading: loadingJournal,
+    refetch: refetchJournal
   } = useJournalEntry(selectedEvent?.journalId);
 
   const { 
@@ -131,12 +135,45 @@ const CalendarView = () => {
 
   const { data: eventTags = [] } = useJournalTags(tagIds);
 
+  // Check for return from journal create/edit page
+  useEffect(() => {
+    const returnInfo = location.state?.returnTo;
+    if (returnInfo && returnInfo.path === '/dashboard/calendar') {
+      // We're returning from journal entry page, refresh the data
+      refreshEvents();
+      
+      // If there's an eventId specified, open the modal for it
+      if (returnInfo.eventId) {
+        // Need to wait for events to load before finding the event
+        const timer = setTimeout(() => {
+          const returnedEvent = events.find(event => event.id === returnInfo.eventId);
+          if (returnedEvent) {
+            setSelectedEvent(returnedEvent);
+            setIsSheetOpen(true);
+            
+            // If the event has a journal, refetch it
+            if (returnedEvent.journalId) {
+              refetchJournal();
+            }
+          }
+          
+          // Clear the return state
+          navigate(location.pathname, { replace: true, state: {} });
+        }, 200);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [location.state, events, navigate, location.pathname, refreshEvents, refetchJournal]);
+
   // Force an initial fetch and prefetch on component mount
   useEffect(() => {
     if (user?.id) {
+      // Invalidate all journal queries when viewing the calendar
+      invalidateJournalQueries(queryClient);
       prefetchAdjacentMonths();
     }
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, queryClient, prefetchAdjacentMonths]); 
 
   // Continue prefetching when month changes or events load
   useEffect(() => {
@@ -146,6 +183,11 @@ const CalendarView = () => {
   }, [currentDate, loadingEvents, prefetchAdjacentMonths]);
 
   const handleEventClick = (event: CalendarEvent) => {
+    // If the event has a journal ID, ensure we have fresh journal data
+    if (event.journalId) {
+      queryClient.invalidateQueries({ queryKey: ['journal-entry', event.journalId] });
+    }
+    
     setSelectedEvent(event);
     setIsSheetOpen(true);
   };

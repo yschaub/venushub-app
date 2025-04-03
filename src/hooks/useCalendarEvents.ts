@@ -111,7 +111,7 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
   const query = useQuery({
     queryKey: ['calendar-events', monthKey, userId],
     queryFn: () => fetchEventsForMonth(date, userId),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // Changed from 5 minutes to 0 to always refetch on focus
     enabled: !!userId,
     meta: {
       onError: () => {
@@ -133,15 +133,20 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
     queryClient.prefetchQuery({
       queryKey: ['calendar-events', nextMonthKey, userId],
       queryFn: () => fetchEventsForMonth(nextMonth, userId),
-      staleTime: 5 * 60 * 1000,
+      staleTime: 0, // Changed to match main query
     });
 
     // Prefetch previous month
     queryClient.prefetchQuery({
       queryKey: ['calendar-events', prevMonthKey, userId],
       queryFn: () => fetchEventsForMonth(prevMonth, userId),
-      staleTime: 5 * 60 * 1000,
+      staleTime: 0, // Changed to match main query
     });
+  };
+
+  // Function to manually invalidate calendar data
+  const refreshEvents = () => {
+    queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
   };
 
   return {
@@ -150,5 +155,6 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
     isError: query.isError,
     error: query.error,
     prefetchAdjacentMonths,
+    refreshEvents,
   };
 };
