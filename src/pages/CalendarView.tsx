@@ -625,7 +625,7 @@ const CalendarView = () => {
         </Calendar>
 
         <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-          <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+          <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>
                 {selectedEvent?.title}
