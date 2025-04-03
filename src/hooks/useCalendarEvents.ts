@@ -130,6 +130,8 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
     retry: 2, // Retry twice, then fail
     retryDelay: 1000, // Wait 1 second between retries
     enabled: !!userId,
+    // Force a refetch when the component mounts
+    refetchOnMount: 'always', 
   });
 
   // Function to prefetch adjacent months

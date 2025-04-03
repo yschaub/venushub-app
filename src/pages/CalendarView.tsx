@@ -141,22 +141,23 @@ const CalendarView = () => {
   const { data: eventTags = [] } = useJournalTags(tagIds);
 
   useEffect(() => {
-    if (user?.id && !initialLoadComplete) {
+    if (user?.id) {
       console.log("Executing initial calendar data load");
-      
-      setInitialLoadComplete(true);
       
       queryClient.fetchQuery({
         queryKey: ['calendar-events', getMonthKey(currentDate), user.id],
-        queryFn: () => {
-          console.log("Forced initial data fetch");
-          return queryClient.fetchQuery({
-            queryKey: ['calendar-events', getMonthKey(currentDate), user.id]
-          });
-        }
       });
+      
+      const timer = setTimeout(() => {
+        if (events.length === 0 && !isLoadingEvents) {
+          console.log("No events loaded yet, forcing refresh");
+          refreshEvents();
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
-  }, [user?.id, initialLoadComplete, currentDate, queryClient]);
+  }, [user?.id, queryClient, currentDate, refreshEvents, events.length, isLoadingEvents]);
 
   useEffect(() => {
     if (eventsError && user?.id) {
