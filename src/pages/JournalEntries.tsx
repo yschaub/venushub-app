@@ -39,6 +39,12 @@ const JournalEntries: React.FC = () => {
             *,
             journal_entry_tags (
               tag_id
+            ),
+            annotations:journal_entry_annotations (
+              id,
+              content,
+              selected_text,
+              created_at
             )
           `)
           .eq('user_id', user.id)
@@ -54,11 +60,29 @@ const JournalEntries: React.FC = () => {
 
         if (tagsError) throw tagsError;
 
-        // Process entries to include tags array
-        const entriesWithTags = entriesData.map(entry => ({
-          ...entry,
-          tags: entry.journal_entry_tags.map((t: any) => t.tag_id)
-        }));
+        // Process entries to include tags array and annotations
+        const entriesWithTags = entriesData.map(entry => {
+          // Process the content to include created_at in the marks
+          if (entry.content && entry.annotations) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(entry.content, 'text/html');
+
+            doc.querySelectorAll('mark[data-type="annotation"]').forEach(mark => {
+              const id = mark.getAttribute('data-id');
+              const annotation = entry.annotations.find(a => a.id === id);
+              if (annotation) {
+                mark.setAttribute('data-created-at', annotation.created_at);
+              }
+            });
+
+            entry.content = doc.body.innerHTML;
+          }
+
+          return {
+            ...entry,
+            tags: entry.journal_entry_tags.map((t: any) => t.tag_id)
+          };
+        });
 
         // Fetch event tags for entries that are linked to events
         const entriesWithEvents = entriesWithTags.filter(entry => entry.event_id);
