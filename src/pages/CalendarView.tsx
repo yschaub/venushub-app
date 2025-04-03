@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link, BookOpen, Tag } from 'lucide-react';
 import {
@@ -20,10 +20,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { format, startOfMonth, endOfMonth, addMonths, isSameMonth } from 'date-fns';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { format, startOfMonth, endOfMonth, addMonths, isSameMonth, formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { computePosition, flip, shift, offset } from '@floating-ui/dom';
 
 interface Event {
   id: string;
@@ -69,6 +76,7 @@ interface Annotation {
   id: string;
   content: string;
   selectedText?: string;
+  created_at: string;
 }
 
 interface Narrative {
@@ -86,11 +94,14 @@ const parseContent = (content: string) => {
     const id = mark.getAttribute('data-id') || '';
     const annotationContent = mark.getAttribute('data-content') || '';
     const selectedText = mark.textContent || '';
+    const createdAt = mark.getAttribute('data-created-at') || '';
 
-    // Create a new mark element with the same styling
+    // Create a new mark element with tooltip trigger
     const highlightMark = doc.createElement('mark');
-    highlightMark.className = 'bg-yellow-100 dark:bg-yellow-900/30 px-0.5 rounded';
+    highlightMark.className = 'bg-yellow-100 dark:bg-yellow-900/30 px-0.5 rounded cursor-help hover:bg-yellow-200 dark:hover:bg-yellow-800/50 transition-colors';
     highlightMark.setAttribute('data-annotation-ref', id);
+    highlightMark.setAttribute('data-content', annotationContent);
+    highlightMark.setAttribute('data-created-at', createdAt);
     highlightMark.textContent = selectedText;
 
     // Replace the original mark with our highlighted version
@@ -99,7 +110,8 @@ const parseContent = (content: string) => {
     annotations.push({
       id,
       content: annotationContent,
-      selectedText
+      selectedText,
+      created_at: createdAt
     });
   });
 
@@ -127,6 +139,12 @@ const CalendarView = () => {
   const [journalEntry, setJournalEntry] = useState<JournalEntry | null>(null);
   const [loadingJournal, setLoadingJournal] = useState(false);
   const [journalNarratives, setJournalNarratives] = useState<Narrative[]>([]);
+  const [hoveredAnnotation, setHoveredAnnotation] = useState<{
+    element: HTMLElement;
+    content: string;
+    created_at: string;
+  } | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   const getMonthKey = useCallback((date: Date) => {
@@ -269,13 +287,37 @@ const CalendarView = () => {
     try {
       const { data: entry, error } = await supabase
         .from('journal_entries')
-        .select('*')
+        .select(`
+          *,
+          annotations:journal_entry_annotations (
+            id,
+            content,
+            selected_text,
+            created_at
+          )
+        `)
         .eq('id', journalId)
         .single();
 
       if (error) {
         console.error('Error fetching journal entry:', error);
         return;
+      }
+
+      // Process the content to include created_at in the marks
+      if (entry.content) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(entry.content, 'text/html');
+
+        doc.querySelectorAll('mark[data-type="annotation"]').forEach(mark => {
+          const id = mark.getAttribute('data-id');
+          const annotation = entry.annotations?.find(a => a.id === id);
+          if (annotation) {
+            mark.setAttribute('data-created-at', annotation.created_at);
+          }
+        });
+
+        entry.content = doc.body.innerHTML;
       }
 
       setJournalEntry(entry);
@@ -429,6 +471,37 @@ const CalendarView = () => {
     }
   };
 
+  useEffect(() => {
+    if (!hoveredAnnotation || !tooltipRef.current) return;
+
+    const updatePosition = () => {
+      computePosition(hoveredAnnotation.element, tooltipRef.current!, {
+        placement: 'top',
+        middleware: [
+          offset(8),
+          flip(),
+          shift({ padding: 5 })
+        ],
+      }).then(({ x, y }) => {
+        if (tooltipRef.current) {
+          Object.assign(tooltipRef.current.style, {
+            left: `${x}px`,
+            top: `${y}px`,
+          });
+        }
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [hoveredAnnotation]);
+
   if (loading && !eventCache[getMonthKey(currentDate)]) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -438,171 +511,175 @@ const CalendarView = () => {
   }
 
   return (
-    <>
-      <Calendar
-        events={events}
-        view="month"
-        onEventClick={handleEventClick}
-        defaultDate={currentDate}
-        onChangeDate={handleMonthChange}
-      >
-        <div className="h-dvh py-6 flex flex-col">
-          <div className="flex px-6 items-center gap-2 mb-6">
-            <span className="flex-1" />
+    <TooltipProvider>
+      <>
+        <Calendar
+          events={events}
+          view="month"
+          onEventClick={handleEventClick}
+          defaultDate={currentDate}
+          onChangeDate={handleMonthChange}
+        >
+          <div className="h-dvh py-6 flex flex-col">
+            <div className="flex px-6 items-center gap-2 mb-6">
+              <span className="flex-1" />
 
-            <CalendarCurrentDate />
+              <CalendarCurrentDate />
 
-            <CalendarPrevTrigger>
-              <ChevronLeft size={20} />
-              <span className="sr-only">Previous</span>
-            </CalendarPrevTrigger>
+              <CalendarPrevTrigger>
+                <ChevronLeft size={20} />
+                <span className="sr-only">Previous</span>
+              </CalendarPrevTrigger>
 
-            <CalendarTodayTrigger>Today</CalendarTodayTrigger>
+              <CalendarTodayTrigger>Today</CalendarTodayTrigger>
 
-            <CalendarNextTrigger>
-              <ChevronRight size={20} />
-              <span className="sr-only">Next</span>
-            </CalendarNextTrigger>
-          </div>
+              <CalendarNextTrigger>
+                <ChevronRight size={20} />
+                <span className="sr-only">Next</span>
+              </CalendarNextTrigger>
+            </div>
 
-          <div className="flex-1 overflow-auto px-6 relative">
-            <CalendarMonthView />
-            {loadingMonth && (
-              <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-                <div className="text-sm text-muted-foreground">Loading events...</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </Calendar>
-
-      <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <DialogContent className="max-w-[1000px] max-h-[85vh] flex flex-col">
-          <DialogHeader className="flex-none">
-            <DialogTitle>{selectedEvent?.title}</DialogTitle>
-            <DialogDescription className="space-y-3">
-              {selectedEvent && (
-                <>
-                  <p>
-                    <strong>Date:</strong> {format(selectedEvent.start, 'PPP')}
-                  </p>
-
-                  {eventTags.length > 0 && (
-                    <div className="mt-3">
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                        <Tag className="h-3 w-3" />
-                        <span>Tags:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {eventTags.map(tag => (
-                          <Badge
-                            key={tag.id}
-                            variant="secondary"
-                            className={`${tag.category === 'Planets' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                              tag.category === 'Event' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
-                                tag.category === 'Sign' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                                  tag.category === 'Aspect' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                                    tag.category === 'Direction' ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' :
-                                      tag.category === 'Cycle' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
-                                        tag.category === 'Houses' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' :
-                                          'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-                              }`}
-                          >
-                            {tag.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {!loadingRelatedEvents && relatedEvents.length > 0 && (
-                    <div className="mt-3">
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                        <Link className="h-3 w-3" />
-                        <span>Connected to:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-2 text-sm">
-                        {relatedEvents.map((event, index) => (
-                          <React.Fragment key={event.id}>
-                            <button
-                              className="text-primary hover:underline"
-                              onClick={() => {
-                                const calendarEvent = events.find(e => e.id === event.id);
-                                if (calendarEvent) {
-                                  setSelectedEvent(calendarEvent);
-                                  fetchRelatedEvents(event.id);
-                                }
-                              }}
-                            >
-                              {event.title}
-                            </button>
-                            {index < relatedEvents.length - 1 && <span className="text-muted-foreground">•</span>}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {journalNarratives.length > 0 && (
-                    <div className="mt-3">
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                        <BookOpen className="h-3 w-3" />
-                        <span>Part of narratives:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-2 text-sm">
-                        {journalNarratives.map((narrative, index) => (
-                          <React.Fragment key={narrative.id}>
-                            <button
-                              className="text-primary hover:underline"
-                              onClick={() => navigate(`/dashboard/narratives/${narrative.id}`)}
-                            >
-                              {narrative.title}
-                            </button>
-                            {index < journalNarratives.length - 1 && <span className="text-muted-foreground">•</span>}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
+            <div className="flex-1 overflow-auto px-6 relative">
+              <CalendarMonthView />
+              {loadingMonth && (
+                <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+                  <div className="text-sm text-muted-foreground">Loading events...</div>
+                </div>
               )}
-            </DialogDescription>
-          </DialogHeader>
+            </div>
+          </div>
+        </Calendar>
 
-          <div className="flex-1 overflow-y-auto pr-6 -mr-6">
-            {selectedEvent?.primary_event && (
-              <div className="mt-4">
-                {selectedEvent.hasJournal ? (
-                  <div className="space-y-4">
-                    {loadingJournal ? (
-                      <div className="flex items-center justify-center py-4">
-                        <p className="text-sm text-muted-foreground">Loading journal entry...</p>
+        <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedEvent?.title}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedEvent && (
+                  <>
+                    <div className="text-sm text-muted-foreground">
+                      {format(selectedEvent.start, 'MMMM d, yyyy')}
+                    </div>
+                    {selectedEvent.tags && selectedEvent.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {selectedEvent.tags.map((tagId) => {
+                          const tag = eventTags.find(t => t.id === tagId);
+                          return tag ? (
+                            <Badge key={tagId} variant="outline" className="text-xs">
+                              {tag.name}
+                            </Badge>
+                          ) : null;
+                        })}
                       </div>
-                    ) : journalEntry ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-medium flex items-center gap-2">
-                            <BookOpen className="h-4 w-4" />
-                            Journal Entry
-                          </h3>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/dashboard/journal/${journalEntry.id}/edit`)}
-                          >
-                            Edit
-                          </Button>
+                    )}
+
+                    {!loadingRelatedEvents && relatedEvents.length > 0 && (
+                      <div className="mt-3">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+                          <Link className="h-3 w-3" />
+                          <span>Connected to:</span>
                         </div>
-                        <div className="grid grid-cols-[1fr,350px] gap-6">
+                        <div className="flex flex-wrap gap-x-2 text-sm">
+                          {relatedEvents.map((event, index) => (
+                            <React.Fragment key={event.id}>
+                              <button
+                                className="text-primary hover:underline"
+                                onClick={() => {
+                                  const calendarEvent = events.find(e => e.id === event.id);
+                                  if (calendarEvent) {
+                                    setSelectedEvent(calendarEvent);
+                                    fetchRelatedEvents(event.id);
+                                  }
+                                }}
+                              >
+                                {event.title}
+                              </button>
+                              {index < relatedEvents.length - 1 && <span className="text-muted-foreground">•</span>}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {journalNarratives.length > 0 && (
+                      <div className="mt-3">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+                          <BookOpen className="h-3 w-3" />
+                          <span>Part of narratives:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-2 text-sm">
+                          {journalNarratives.map((narrative, index) => (
+                            <React.Fragment key={narrative.id}>
+                              <button
+                                className="text-primary hover:underline"
+                                onClick={() => navigate(`/dashboard/narratives/${narrative.id}`)}
+                              >
+                                {narrative.title}
+                              </button>
+                              {index < journalNarratives.length - 1 && <span className="text-muted-foreground">•</span>}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto pr-6 -mr-6">
+              {selectedEvent?.primary_event && (
+                <div className="mt-4">
+                  {selectedEvent.hasJournal ? (
+                    <div className="space-y-4">
+                      {loadingJournal ? (
+                        <div className="flex items-center justify-center py-4">
+                          <p className="text-sm text-muted-foreground">Loading journal entry...</p>
+                        </div>
+                      ) : journalEntry ? (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-medium flex items-center gap-2">
+                              <BookOpen className="h-4 w-4" />
+                              Journal Entry
+                            </h3>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/dashboard/journal/${journalEntry.id}/edit`)}
+                            >
+                              Edit
+                            </Button>
+                          </div>
                           <div className="rounded-lg border bg-card">
                             <div className="p-4 prose prose-sm max-w-none [&>div:first-child>p]:mt-0 [&>div:last-child>p]:mb-0">
                               {journalEntry.content.split(/(<p>.*?<\/p>)/).filter(Boolean).map((paragraph, index) => {
                                 if (paragraph.startsWith('<p>')) {
-                                  const { content, annotations } = parseContent(paragraph);
+                                  const { content } = parseContent(paragraph);
                                   return (
                                     <div key={index}>
                                       <p
                                         dangerouslySetInnerHTML={{ __html: content }}
+                                        onMouseOver={(e) => {
+                                          const target = e.target as HTMLElement;
+                                          const mark = target.closest('mark[data-annotation-ref]') as HTMLElement;
+                                          if (mark) {
+                                            const content = mark.getAttribute('data-content');
+                                            const createdAt = mark.getAttribute('data-created-at');
+                                            if (content && createdAt) {
+                                              setHoveredAnnotation({
+                                                element: mark,
+                                                content,
+                                                created_at: createdAt
+                                              });
+                                            }
+                                          }
+                                        }}
+                                        onMouseOut={() => {
+                                          setHoveredAnnotation(null);
+                                        }}
                                       />
                                     </div>
                                   );
@@ -611,68 +688,38 @@ const CalendarView = () => {
                               })}
                             </div>
                           </div>
-                          <div className="rounded-lg border bg-card">
-                            <div className="border-b px-3 py-2 bg-muted/50">
-                              <div className="text-sm font-medium">
-                                Annotations ({journalEntry.content.split(/(<p>.*?<\/p>)/).filter(Boolean)
-                                  .reduce((count, paragraph) => {
-                                    if (paragraph.startsWith('<p>')) {
-                                      const { annotations } = parseContent(paragraph);
-                                      return count + annotations.length;
-                                    }
-                                    return count;
-                                  }, 0)})
+                          {hoveredAnnotation && (
+                            <div
+                              ref={tooltipRef}
+                              className="fixed z-50 px-2 py-1 text-sm rounded shadow-lg border bg-white dark:bg-gray-800 text-foreground max-w-[300px]"
+                            >
+                              <div className="mb-1">{hoveredAnnotation.content}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(new Date(hoveredAnnotation.created_at), { addSuffix: true })}
                               </div>
                             </div>
-                            <div className="p-3 space-y-3">
-                              {journalEntry.content.split(/(<p>.*?<\/p>)/).filter(Boolean).map((paragraph, index) => {
-                                if (paragraph.startsWith('<p>')) {
-                                  const { annotations } = parseContent(paragraph);
-                                  return annotations.map((annotation) => (
-                                    <div
-                                      key={annotation.id}
-                                      className="rounded-lg border bg-card text-sm"
-                                    >
-                                      <div className="border-b bg-yellow-100 dark:bg-yellow-900/30 px-3 py-2">
-                                        {annotation.selectedText}
-                                      </div>
-                                      <div className="px-3 py-2 space-y-2">
-                                        <div>{annotation.content}</div>
-                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                          <div>9 minutes ago</div>
-                                          <button className="opacity-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ));
-                                }
-                                return null;
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center gap-1 w-full"
-                    onClick={handleJournalAction}
-                  >
-                    <BookOpen className="h-3.5 w-3.5" />
-                    Journal About This
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center gap-1 w-full"
+                      onClick={handleJournalAction}
+                    >
+                      <BookOpen className="h-3.5 w-3.5" />
+                      Journal About This
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
+    </TooltipProvider>
   );
 };
 
