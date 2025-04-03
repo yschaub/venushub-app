@@ -157,7 +157,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
               tooltip="Journal"
             >
               <BookOpen />
-              <span>Journal</span>
+              <span>Journal Entries</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
 

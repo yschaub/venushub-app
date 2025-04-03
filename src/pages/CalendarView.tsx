@@ -638,11 +638,24 @@ const CalendarView = () => {
                     </div>
                     {eventTags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {eventTags.map((tag) => (
-                          <Badge key={tag.id} variant="outline" className="text-xs">
-                            {tag.name}
-                          </Badge>
-                        ))}
+                        {eventTags.map((tag) => {
+                          // If this is a journal entry, check if the tag is also in the event
+                          const isEventTag = selectedEvent?.hasJournal && selectedEvent.tags?.includes(tag.id);
+                          return (
+                            <Badge
+                              key={tag.id}
+                              variant="outline"
+                              className={cn(
+                                "border-0 text-xs",
+                                isEventTag
+                                  ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                                  : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                              )}
+                            >
+                              {tag.name}
+                            </Badge>
+                          );
+                        })}
                       </div>
                     )}
                     {!selectedEvent.hasJournal && selectedEvent.tags && selectedEvent.tags.length > 0 && eventTags.length === 0 && (
@@ -650,7 +663,11 @@ const CalendarView = () => {
                         {selectedEvent.tags.map((tagId) => {
                           const tag = eventTags.find(t => t.id === tagId);
                           return tag ? (
-                            <Badge key={tagId} variant="outline" className="text-xs">
+                            <Badge
+                              key={tagId}
+                              variant="outline"
+                              className="border-0 text-xs bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                            >
                               {tag.name}
                             </Badge>
                           ) : null;

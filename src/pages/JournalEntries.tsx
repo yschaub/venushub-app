@@ -8,8 +8,9 @@ import JournalEntryList from '@/components/JournalEntryList';
 
 const JournalEntries: React.FC = () => {
   const [entries, setEntries] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [tags, setTags] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [eventTags, setEventTags] = useState<{ [key: string]: string[] }>({});
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -18,24 +19,34 @@ const JournalEntries: React.FC = () => {
       try {
         setIsLoading(true);
 
-        // Get current user
+        // First get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-
         if (userError) throw userError;
 
         if (!user) {
-          throw new Error("No authenticated user found");
+          toast({
+            title: "Authentication Error",
+            description: "You must be logged in to view journal entries",
+            variant: "destructive"
+          });
+          return;
         }
 
-        // Fetch entries for current user only
+        // Fetch journal entries with their tags
         const { data: entriesData, error: entriesError } = await supabase
           .from('journal_entries')
-          .select('*')
+          .select(`
+            *,
+            journal_entry_tags (
+              tag_id
+            )
+          `)
           .eq('user_id', user.id)
-          .order('date_created', { ascending: false });
+          .order('date', { ascending: false });
 
         if (entriesError) throw entriesError;
 
+        // Fetch all available tags
         const { data: tagsData, error: tagsError } = await supabase
           .from('system_tags')
           .select('*')
@@ -43,22 +54,34 @@ const JournalEntries: React.FC = () => {
 
         if (tagsError) throw tagsError;
 
-        // Fetch tags for each entry
-        const entriesWithTags = await Promise.all(
-          entriesData.map(async (entry) => {
-            const { data: entryTags, error: entryTagsError } = await supabase
-              .from('journal_entry_tags')
-              .select('tag_id')
-              .eq('journal_entry_id', entry.id);
+        // Process entries to include tags array
+        const entriesWithTags = entriesData.map(entry => ({
+          ...entry,
+          tags: entry.journal_entry_tags.map((t: any) => t.tag_id)
+        }));
 
-            if (entryTagsError) throw entryTagsError;
+        // Fetch event tags for entries that are linked to events
+        const entriesWithEvents = entriesWithTags.filter(entry => entry.event_id);
+        if (entriesWithEvents.length > 0) {
+          const { data: eventsData, error: eventsError } = await supabase
+            .from('events')
+            .select('id, tags')
+            .in('id', entriesWithEvents.map(entry => entry.event_id));
 
-            return {
-              ...entry,
-              tags: entryTags.map(et => et.tag_id)
-            };
-          })
-        );
+          if (eventsError) {
+            console.error('Error fetching event tags:', eventsError);
+          } else {
+            // Create a map of entry IDs to their event tags
+            const eventTagsMap: { [key: string]: string[] } = {};
+            entriesWithEvents.forEach(entry => {
+              const event = eventsData.find(e => e.id === entry.event_id);
+              if (event?.tags) {
+                eventTagsMap[entry.id] = event.tags;
+              }
+            });
+            setEventTags(eventTagsMap);
+          }
+        }
 
         setEntries(entriesWithTags);
         setTags(tagsData);
@@ -104,6 +127,12 @@ const JournalEntries: React.FC = () => {
       if (error) throw error;
 
       setEntries(entries.filter(entry => entry.id !== id));
+      // Also remove from eventTags
+      setEventTags(prev => {
+        const newEventTags = { ...prev };
+        delete newEventTags[id];
+        return newEventTags;
+      });
 
       toast({
         title: "Success",
@@ -130,6 +159,7 @@ const JournalEntries: React.FC = () => {
         isLoading={isLoading}
         onDelete={handleDeleteEntry}
         tags={tags}
+        eventTags={eventTags}
       />
     </div>
   );
