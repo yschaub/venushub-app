@@ -1,4 +1,3 @@
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -31,45 +30,53 @@ export interface Narrative {
 }
 
 export const fetchJournalEntry = async (journalId: string) => {
-  const { data: entry, error } = await supabase
-    .from('journal_entries')
-    .select(`
-      *,
-      annotations:journal_entry_annotations (
-        id,
-        content,
-        selected_text,
-        created_at
-      ),
-      journal_entry_tags (
-        tag_id
-      )
-    `)
-    .eq('id', journalId)
-    .single();
+  console.log('Fetching journal entry:', journalId);
+  
+  try {
+    const { data: entry, error } = await supabase
+      .from('journal_entries')
+      .select(`
+        *,
+        annotations:journal_entry_annotations (
+          id,
+          content,
+          selected_text,
+          created_at
+        ),
+        journal_entry_tags (
+          tag_id
+        )
+      `)
+      .eq('id', journalId)
+      .single();
 
-  if (error) {
-    console.error('Error fetching journal entry:', error);
-    throw new Error('Failed to load journal entry');
+    if (error) {
+      console.error('Error fetching journal entry:', error);
+      throw new Error('Failed to load journal entry');
+    }
+
+    // Process the content to include created_at in the marks
+    if (entry.content) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(entry.content, 'text/html');
+
+      doc.querySelectorAll('mark[data-type="annotation"]').forEach(mark => {
+        const id = mark.getAttribute('data-id');
+        const annotation = entry.annotations?.find(a => a.id === id);
+        if (annotation) {
+          mark.setAttribute('data-created-at', annotation.created_at);
+        }
+      });
+
+      entry.content = doc.body.innerHTML;
+    }
+
+    console.log('Journal entry loaded successfully:', journalId);
+    return entry;
+  } catch (error) {
+    console.error('Error in fetchJournalEntry:', error);
+    throw error;
   }
-
-  // Process the content to include created_at in the marks
-  if (entry.content) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(entry.content, 'text/html');
-
-    doc.querySelectorAll('mark[data-type="annotation"]').forEach(mark => {
-      const id = mark.getAttribute('data-id');
-      const annotation = entry.annotations?.find(a => a.id === id);
-      if (annotation) {
-        mark.setAttribute('data-created-at', annotation.created_at);
-      }
-    });
-
-    entry.content = doc.body.innerHTML;
-  }
-
-  return entry;
 };
 
 export const useJournalEntry = (journalId: string | undefined) => {
@@ -80,6 +87,8 @@ export const useJournalEntry = (journalId: string | undefined) => {
     queryFn: () => fetchJournalEntry(journalId!),
     enabled: !!journalId,
     staleTime: 0, // Always refetch when needed
+    gcTime: 0, // Don't keep old data in cache
+    retry: 1, // Only retry once to avoid infinite loading
   });
 };
 
@@ -138,8 +147,9 @@ export const useJournalNarratives = (journalId: string | undefined) => {
   });
 };
 
-// New utility function to invalidate all journal-related queries
 export const invalidateJournalQueries = (queryClient: any, eventId?: string) => {
+  console.log('Invalidating journal queries', eventId ? `for event: ${eventId}` : '');
+  
   // Invalidate all journal entries
   queryClient.invalidateQueries({ queryKey: ['journal-entry'] });
   

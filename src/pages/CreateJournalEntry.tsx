@@ -100,9 +100,15 @@ const CreateJournalEntry: React.FC = () => {
   }
 
   const handleSuccess = () => {
-    // Invalidate all relevant queries when a new journal is created
+    console.log("Journal entry created successfully");
+    
+    // Force invalidate all relevant queries when a new journal is created
     if (eventData?.id) {
+      console.log("Invalidating queries for event:", eventData.id);
       invalidateJournalQueries(queryClient, eventData.id);
+      
+      // Force a refresh of the calendar events
+      queryClient.removeQueries({ queryKey: ['calendar-events'] });
     }
     
     // Navigate back - either to the returnTo location or the journal page
