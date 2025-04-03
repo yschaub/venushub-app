@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -39,8 +39,8 @@ interface JournalEntryEditorProps {
   eventId?: string;
   eventDate?: string;
   tags: Tag[];
-  onSuccess: () => void;
-  onCancel: () => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
@@ -69,6 +69,8 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   const editorRef = useRef<RichTextEditorRef>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo;
 
   console.log("Initial tags from event:", initialValues.tags);
   console.log("Selected tags state:", selectedTags);
@@ -340,6 +342,17 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
             ? "Journal entry for event created successfully"
             : "Journal entry created successfully"
         });
+
+        // Handle return navigation
+        if (returnTo?.path === '/dashboard/calendar' && returnTo?.eventId) {
+          navigate(returnTo.path, {
+            state: { openEventId: returnTo.eventId }
+          });
+        } else if (onSuccess) {
+          onSuccess();
+        } else {
+          navigate('/dashboard/journal');
+        }
       } else if (mode === 'edit' && entryId) {
         const { error: entryError } = await supabase
           .from('journal_entries')
@@ -416,9 +429,18 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           title: "Success",
           description: "Journal entry updated successfully"
         });
-      }
 
-      onSuccess();
+        // Handle return navigation
+        if (returnTo?.path === '/dashboard/calendar' && returnTo?.eventId) {
+          navigate(returnTo.path, {
+            state: { openEventId: returnTo.eventId }
+          });
+        } else if (onSuccess) {
+          onSuccess();
+        } else {
+          navigate('/dashboard/journal');
+        }
+      }
     } catch (error) {
       console.error('Error saving journal entry:', error);
       toast({
@@ -428,6 +450,18 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (returnTo?.path === '/dashboard/calendar' && returnTo?.eventId) {
+      navigate(returnTo.path, {
+        state: { openEventId: returnTo.eventId }
+      });
+    } else if (onCancel) {
+      onCancel();
+    } else {
+      navigate('/dashboard/journal');
     }
   };
 
@@ -481,7 +515,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
               <Button
                 type="button"
                 variant="outline"
-                onClick={onCancel}
+                onClick={handleCancel}
                 disabled={isLoading}
               >
                 Cancel

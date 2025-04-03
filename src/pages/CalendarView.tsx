@@ -27,7 +27,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { format, startOfMonth, endOfMonth, addMonths, isSameMonth, formatDistanceToNow } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { computePosition, flip, shift, offset } from '@floating-ui/dom';
@@ -146,6 +146,7 @@ const CalendarView = () => {
   } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const getMonthKey = useCallback((date: Date) => {
     return format(date, 'yyyy-MM');
@@ -294,6 +295,9 @@ const CalendarView = () => {
             content,
             selected_text,
             created_at
+          ),
+          journal_entry_tags (
+            tag_id
           )
         `)
         .eq('id', journalId)
@@ -318,6 +322,23 @@ const CalendarView = () => {
         });
 
         entry.content = doc.body.innerHTML;
+      }
+
+      // Fetch tags data for the journal entry
+      if (entry.journal_entry_tags && entry.journal_entry_tags.length > 0) {
+        const tagIds = entry.journal_entry_tags.map(t => t.tag_id);
+        const { data: tagsData, error: tagsError } = await supabase
+          .from('system_tags')
+          .select('*')
+          .in('id', tagIds);
+
+        if (tagsError) {
+          console.error('Error fetching journal entry tags:', tagsError);
+        } else {
+          setEventTags(tagsData || []);
+        }
+      } else {
+        setEventTags([]);
       }
 
       setJournalEntry(entry);
@@ -405,10 +426,15 @@ const CalendarView = () => {
     setSelectedEvent(event);
     setIsSheetOpen(true);
     setJournalEntry(null);
+    setEventTags([]); // Reset tags
 
     await fetchRelatedEvents(event.id);
 
-    if (event.tags && event.tags.length > 0) {
+    // If there's a journal entry, its tags will be fetched in fetchJournalEntry
+    if (event.hasJournal && event.journalId) {
+      await fetchJournalEntry(event.journalId);
+    } else if (event.tags && event.tags.length > 0) {
+      // Only fetch event tags if there's no journal entry
       const { data: tagsData, error: tagsError } = await supabase
         .from('system_tags')
         .select('*')
@@ -420,13 +446,6 @@ const CalendarView = () => {
       }
 
       setEventTags(tagsData || []);
-    } else {
-      setEventTags([]);
-    }
-
-    // Fetch journal entry if it exists
-    if (event.hasJournal && event.journalId) {
-      await fetchJournalEntry(event.journalId);
     }
   };
 
@@ -439,7 +458,14 @@ const CalendarView = () => {
     }
 
     if (selectedEvent?.hasJournal && selectedEvent?.journalId) {
-      navigate(`/dashboard/journal/${selectedEvent.journalId}/edit`);
+      navigate(`/dashboard/journal/${selectedEvent.journalId}/edit`, {
+        state: {
+          returnTo: {
+            path: '/dashboard/calendar',
+            eventId: selectedEvent.id
+          }
+        }
+      });
     } else if (selectedEvent) {
       navigate('/dashboard/journal/create', {
         state: {
@@ -448,6 +474,10 @@ const CalendarView = () => {
             title: selectedEvent.title,
             tags: selectedEvent.tags || [],
             date: format(selectedEvent.start, 'yyyy-MM-dd')
+          },
+          returnTo: {
+            path: '/dashboard/calendar',
+            eventId: selectedEvent.id
           }
         }
       });
@@ -501,6 +531,50 @@ const CalendarView = () => {
       window.removeEventListener('resize', updatePosition);
     };
   }, [hoveredAnnotation]);
+
+  // Add effect to handle return navigation
+  useEffect(() => {
+    const openEventId = location.state?.openEventId;
+    if (!openEventId || loading) return;
+
+    // First, find the event in the current month
+    const eventToOpen = events.find(event => event.id === openEventId);
+
+    if (eventToOpen) {
+      handleEventClick(eventToOpen);
+      // Clear the state after opening the event
+      navigate(location.pathname, {
+        replace: true,
+        state: {}
+      });
+    } else {
+      // If event not found in current month, fetch it to get its date
+      const fetchEventDate = async () => {
+        try {
+          const { data: event, error } = await supabase
+            .from('events')
+            .select('date')
+            .eq('id', openEventId)
+            .single();
+
+          if (error || !event) {
+            console.error('Error fetching event:', error);
+            return;
+          }
+
+          // Set the calendar to the event's month
+          const eventDate = new Date(event.date);
+          if (!isSameMonth(eventDate, currentDate)) {
+            setCurrentDate(eventDate);
+          }
+        } catch (error) {
+          console.error('Error fetching event date:', error);
+        }
+      };
+
+      fetchEventDate();
+    }
+  }, [location.state?.openEventId, events, loading, currentDate, navigate, handleEventClick]);
 
   if (loading && !eventCache[getMonthKey(currentDate)]) {
     return (
@@ -562,7 +636,16 @@ const CalendarView = () => {
                     <div className="text-sm text-muted-foreground">
                       {format(selectedEvent.start, 'MMMM d, yyyy')}
                     </div>
-                    {selectedEvent.tags && selectedEvent.tags.length > 0 && (
+                    {eventTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {eventTags.map((tag) => (
+                          <Badge key={tag.id} variant="outline" className="text-xs">
+                            {tag.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {!selectedEvent.hasJournal && selectedEvent.tags && selectedEvent.tags.length > 0 && eventTags.length === 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {selectedEvent.tags.map((tagId) => {
                           const tag = eventTags.find(t => t.id === tagId);
@@ -648,7 +731,14 @@ const CalendarView = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => navigate(`/dashboard/journal/${journalEntry.id}/edit`)}
+                              onClick={() => navigate(`/dashboard/journal/${journalEntry.id}/edit`, {
+                                state: {
+                                  returnTo: {
+                                    path: '/dashboard/calendar',
+                                    eventId: selectedEvent?.id
+                                  }
+                                }
+                              })}
                             >
                               Edit
                             </Button>
