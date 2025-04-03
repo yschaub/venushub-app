@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Routes, Route } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import JournalEntries from '@/pages/JournalEntries';
 import CreateJournalEntry from '@/pages/CreateJournalEntry';
@@ -10,10 +9,12 @@ import Narratives from '@/pages/Narratives';
 import CalendarView from '@/pages/CalendarView';
 import NarrativeShow from '@/pages/NarrativeShow';
 import CreateNarrative from '@/pages/CreateNarrative';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
   // Function to automatically associate journal entries with narratives based on tags
@@ -106,50 +107,36 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: {
-          user
-        }
-      } = await supabase.auth.getUser();
-      if (!user) {
+    const setupDashboard = async () => {
+      if (!isLoading && !user) {
         navigate('/');
         return;
       }
-      setUserEmail(user.email);
 
-      // Associate journal entries with narratives based on tags
-      await associateEntriesWithNarratives(user.id);
-
-      setLoading(false);
-    };
-    getUser();
-
-    const {
-      data: {
-        subscription
+      if (user) {
+        // Associate journal entries with narratives based on tags
+        await associateEntriesWithNarratives(user.id);
+        setLoading(false);
       }
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        navigate('/');
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
     };
-  }, [navigate]);
 
-  if (loading) {
+    setupDashboard();
+  }, [user, isLoading, navigate]);
+
+  if (isLoading || loading) {
     return <div className="flex min-h-screen items-center justify-center">
       <p>Loading...</p>
     </div>;
   }
 
+  if (!user) {
+    return <Navigate to="/" />;
+  }
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <DashboardSidebar userEmail={userEmail} />
+        <DashboardSidebar userEmail={user.email} />
         <SidebarInset>
           <div className="flex h-full flex-col">
             <div className="flex-grow overflow-auto">

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -5,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import JournalEntryList from '@/components/JournalEntryList';
+import { useAuth } from '@/contexts/AuthContext';
 
 const JournalEntries: React.FC = () => {
   const [entries, setEntries] = useState<any[]>([]);
@@ -13,15 +15,12 @@ const JournalEntries: React.FC = () => {
   const [eventTags, setEventTags] = useState<{ [key: string]: string[] }>({});
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchEntries = async () => {
       try {
         setIsLoading(true);
-
-        // First get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
 
         if (!user) {
           toast({
@@ -122,7 +121,7 @@ const JournalEntries: React.FC = () => {
     };
 
     fetchEntries();
-  }, [toast]);
+  }, [toast, user]);
 
   const handleDeleteEntry = async (id: string) => {
     try {
@@ -176,6 +175,13 @@ const JournalEntries: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Journal Entries</h2>
+        <Button 
+          onClick={() => navigate('/dashboard/journal/create')}
+          className="flex items-center gap-2"
+        >
+          <PlusCircle className="h-4 w-4" />
+          New Entry
+        </Button>
       </div>
 
       <JournalEntryList
