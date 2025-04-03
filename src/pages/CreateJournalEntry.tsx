@@ -6,8 +6,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import JournalEntryEditor from '@/components/JournalEntryEditor';
-import { useQueryClient } from '@tanstack/react-query';
-import { invalidateJournalQueries } from '@/hooks/useJournalEntry';
 
 interface EventData {
   id: string;
@@ -22,11 +20,9 @@ const CreateJournalEntry: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient();
 
   // Extract event data from location state if it exists
   const eventData = location.state?.eventData as EventData | undefined;
-  const returnTo = location.state?.returnTo;
 
   // Log the event data for debugging
   console.log("Event data received:", eventData);
@@ -82,9 +78,7 @@ const CreateJournalEntry: React.FC = () => {
               duration: 5000,
             });
             // Redirect to edit page
-            navigate(`/dashboard/journal/${data.id}/edit`, {
-              state: { returnTo }
-            });
+            navigate(`/dashboard/journal/${data.id}/edit`);
           }
         } catch (error) {
           console.error('Error checking existing entry:', error);
@@ -93,35 +87,12 @@ const CreateJournalEntry: React.FC = () => {
     };
     
     checkExistingEntry();
-  }, [toast, eventData, navigate, returnTo]);
+  }, [toast, eventData, navigate]);
 
   if (isLoading) {
     return <div className="p-6 flex justify-center">Loading tags...</div>;
   }
 
-  const handleSuccess = () => {
-    console.log("Journal entry created successfully");
-    
-    // Force invalidate all relevant queries when a new journal is created
-    if (eventData?.id) {
-      console.log("Invalidating queries for event:", eventData.id);
-      
-      // Clear the cached data for this event
-      queryClient.removeQueries({ queryKey: ['calendar-events'] });
-      
-      // Invalidate all relevant queries to ensure fresh data
-      invalidateJournalQueries(queryClient, eventData.id);
-    }
-    
-    // Navigate back - either to the returnTo location or the journal page
-    if (returnTo) {
-      navigate(returnTo.path, { state: { returnTo } });
-    } else {
-      navigate('/dashboard/journal');
-    }
-  };
-
-  
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -156,7 +127,7 @@ const CreateJournalEntry: React.FC = () => {
         }}
         eventId={eventData?.id}
         eventDate={eventData?.date}
-        onSuccess={handleSuccess}
+        onSuccess={() => navigate('/dashboard/journal')}
         onCancel={() => navigate('/dashboard/journal')}
       />
     </div>
