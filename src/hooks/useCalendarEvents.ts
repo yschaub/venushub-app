@@ -44,6 +44,12 @@ export const fetchEventsForMonth = async (date: Date, userId: string | null) => 
     throw new Error('Failed to load events');
   }
 
+  // If no events data, return early
+  if (!eventsData || eventsData.length === 0) {
+    console.log(`No events found for ${getMonthKey(date)}`);
+    return [];
+  }
+
   const eventIds = eventsData.map(event => event.id);
 
   const { data: journalEntries, error: journalError } = await supabase
@@ -140,7 +146,7 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
 
   return {
     events: query.data || [],
-    isLoading: query.isLoading,
+    isLoading: query.isLoading || query.isFetching,
     isError: query.isError,
     error: query.error,
     prefetchAdjacentMonths,

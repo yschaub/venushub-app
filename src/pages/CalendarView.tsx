@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChevronLeft, ChevronRight, BookOpen, Link, Tag } from 'lucide-react';
@@ -130,6 +131,14 @@ const CalendarView = () => {
 
   const { data: eventTags = [] } = useJournalTags(tagIds);
 
+  // Force an initial fetch and prefetch on component mount
+  useEffect(() => {
+    if (user?.id) {
+      prefetchAdjacentMonths();
+    }
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Continue prefetching when month changes or events load
   useEffect(() => {
     if (!loadingEvents) {
       prefetchAdjacentMonths();
