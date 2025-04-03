@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -104,10 +105,12 @@ const CreateJournalEntry: React.FC = () => {
     // Force invalidate all relevant queries when a new journal is created
     if (eventData?.id) {
       console.log("Invalidating queries for event:", eventData.id);
-      invalidateJournalQueries(queryClient, eventData.id);
       
-      // Force a refresh of the calendar events
+      // Clear the cached data for this event
       queryClient.removeQueries({ queryKey: ['calendar-events'] });
+      
+      // Invalidate all relevant queries to ensure fresh data
+      invalidateJournalQueries(queryClient, eventData.id);
     }
     
     // Navigate back - either to the returnTo location or the journal page

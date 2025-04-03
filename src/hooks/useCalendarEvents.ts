@@ -53,16 +53,22 @@ export const fetchEventsForMonth = async (date: Date, userId: string | null) => 
 
     const eventIds = eventsData.map(event => event.id);
 
-    const { data: journalEntries, error: journalError } = await supabase
-      .from('journal_entries')
-      .select('id, event_id')
-      .eq('user_id', userId)
-      .in('event_id', eventIds)
-      .not('event_id', 'is', null);
+    // Only proceed with journal lookup if we have events
+    let journalEntries = [];
+    if (eventIds.length > 0) {
+      const { data: journalData, error: journalError } = await supabase
+        .from('journal_entries')
+        .select('id, event_id')
+        .eq('user_id', userId)
+        .in('event_id', eventIds)
+        .not('event_id', 'is', null);
 
-    if (journalError) {
-      console.error('Error fetching journal entries:', journalError);
-      // Continue anyway, we'll just show events without journal status
+      if (journalError) {
+        console.error('Error fetching journal entries:', journalError);
+        // Continue anyway, we'll just show events without journal status
+      } else {
+        journalEntries = journalData || [];
+      }
     }
 
     const eventJournalMap = new Map();
@@ -119,18 +125,11 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
   const query = useQuery({
     queryKey: ['calendar-events', monthKey, userId],
     queryFn: () => fetchEventsForMonth(date, userId),
-    staleTime: 0, // Always treat data as stale to ensure fresh data
-    gcTime: 0, // Don't keep old data in cache
-    retry: 1, // Only retry once to avoid infinite loading
+    staleTime: 5 * 60 * 1000, // 5 minutes - don't refetch too aggressively
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    retry: 2, // Retry twice, then fail
+    retryDelay: 1000, // Wait 1 second between retries
     enabled: !!userId,
-    meta: {
-      onSettled: (data, error) => {
-        if (error) {
-          console.error('Error fetching events:', error);
-          toast.error("Failed to load events");
-        }
-      }
-    }
   });
 
   // Function to prefetch adjacent months
@@ -146,14 +145,14 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
     queryClient.prefetchQuery({
       queryKey: ['calendar-events', nextMonthKey, userId],
       queryFn: () => fetchEventsForMonth(nextMonth, userId),
-      staleTime: 0,
+      staleTime: 5 * 60 * 1000,
     });
 
     // Prefetch previous month
     queryClient.prefetchQuery({
       queryKey: ['calendar-events', prevMonthKey, userId],
       queryFn: () => fetchEventsForMonth(prevMonth, userId),
-      staleTime: 0,
+      staleTime: 5 * 60 * 1000,
     });
   };
 
@@ -161,9 +160,6 @@ export const useCalendarEvents = (date: Date, userId: string | null) => {
   const refreshEvents = () => {
     // Force invalidate the current month
     queryClient.invalidateQueries({ queryKey: ['calendar-events', monthKey, userId] });
-    
-    // Invalidate all calendar events to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
   };
 
   return {

@@ -98,18 +98,20 @@ const CalendarView = () => {
     content: string;
     created_at: string;
   } | null>(null);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const dataLoadAttempts = useRef(0);
 
   const { 
     events, 
     isLoading: eventsLoading, 
     isFetching: eventsFetching,
     prefetchAdjacentMonths,
-    refreshEvents
+    refreshEvents,
+    isError: eventsError
   } = useCalendarEvents(currentDate, user?.id || null);
 
   const isLoadingEvents = eventsLoading || eventsFetching;
@@ -138,65 +140,62 @@ const CalendarView = () => {
 
   const { data: eventTags = [] } = useJournalTags(tagIds);
 
-  // Immediate data load when user is authenticated
   useEffect(() => {
-    if (user?.id) {
-      console.log("Initial calendar data loading");
+    if (user?.id && !initialLoadComplete) {
+      console.log("Executing initial calendar data load");
       
-      // Force a fresh data fetch for the current month
-      const monthKey = getMonthKey(currentDate);
-      queryClient.removeQueries({ 
-        queryKey: ['calendar-events', monthKey, user.id]
+      setInitialLoadComplete(true);
+      
+      queryClient.fetchQuery({
+        queryKey: ['calendar-events', getMonthKey(currentDate), user.id],
+        queryFn: () => {
+          console.log("Forced initial data fetch");
+          return queryClient.fetchQuery({
+            queryKey: ['calendar-events', getMonthKey(currentDate), user.id]
+          });
+        }
       });
-      refreshEvents();
-      
-      // Also ensure all journal data is fresh
-      invalidateJournalQueries(queryClient);
     }
-  }, [user?.id, currentDate, queryClient, refreshEvents]);
+  }, [user?.id, initialLoadComplete, currentDate, queryClient]);
 
-  // When component mounts, make sure we've loaded initial data
   useEffect(() => {
-    if (user?.id && !initialLoadDone && !isLoadingEvents) {
-      // If we have a user and events aren't loading, mark initial load as done
-      setInitialLoadDone(true);
-      
-      // Prefetch adjacent months for smoother navigation
-      if (events.length > 0) {
-        prefetchAdjacentMonths();
+    if (eventsError && user?.id) {
+      if (dataLoadAttempts.current < 3) {
+        dataLoadAttempts.current += 1;
+        console.log(`Retry attempt ${dataLoadAttempts.current} for calendar data`);
+        
+        const timer = setTimeout(() => {
+          refreshEvents();
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      } else {
+        toast.error("Failed to load calendar events after multiple attempts");
       }
     }
-  }, [user?.id, initialLoadDone, isLoadingEvents, events, prefetchAdjacentMonths]);
+  }, [eventsError, user?.id, refreshEvents]);
 
-  // Check for return from journal create/edit page and refresh data
+  useEffect(() => {
+    if (!isLoadingEvents && events.length > 0 && user?.id) {
+      prefetchAdjacentMonths();
+    }
+  }, [events, isLoadingEvents, prefetchAdjacentMonths, user?.id]);
+
   useEffect(() => {
     const returnInfo = location.state?.returnTo;
     if (returnInfo && returnInfo.path === '/dashboard/calendar') {
       console.log("Returning from journal page, refreshing data");
       
-      // Force refresh all calendar data
       refreshEvents();
       
-      // If there's an eventId specified, open the modal for it
       if (returnInfo.eventId) {
-        // Short timeout to allow data to refresh
         const timer = setTimeout(() => {
-          // Reload the current month's events
-          const monthKey = getMonthKey(currentDate);
-          queryClient.invalidateQueries({ 
-            queryKey: ['calendar-events', monthKey, user?.id] 
-          });
-          
-          // Find the event in our refreshed data
           const returnedEvent = events.find(event => event.id === returnInfo.eventId);
           if (returnedEvent) {
-            console.log("Opening event from return navigation:", returnedEvent.id);
             setSelectedEvent(returnedEvent);
             setIsSheetOpen(true);
             
-            // Refresh journal data if this event has a journal
             if (returnedEvent.journalId) {
-              console.log("Refetching journal for event:", returnedEvent.id);
               queryClient.invalidateQueries({ 
                 queryKey: ['journal-entry', returnedEvent.journalId] 
               });
@@ -204,19 +203,17 @@ const CalendarView = () => {
             }
           }
           
-          // Clear the return state to prevent reprocessing
           navigate(location.pathname, { replace: true, state: {} });
-        }, 300); // Short timeout to allow data loading
+        }, 300);
         
         return () => clearTimeout(timer);
       }
     }
-  }, [location.state, events, navigate, location.pathname, refreshEvents, refetchJournal, currentDate, queryClient, user?.id]);
+  }, [location.state, events, navigate, location.pathname, refreshEvents, refetchJournal, queryClient]);
 
   const handleEventClick = (event: CalendarEvent) => {
     console.log("Event clicked:", event.id);
     
-    // Ensure we have fresh journal data if this event has a journal
     if (event.journalId) {
       queryClient.invalidateQueries({ queryKey: ['journal-entry', event.journalId] });
     }

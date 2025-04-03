@@ -87,8 +87,8 @@ export const useJournalEntry = (journalId: string | undefined) => {
     queryKey: ['journal-entry', journalId],
     queryFn: () => fetchJournalEntry(journalId!),
     enabled: !!journalId,
-    staleTime: 0, // Always refetch when needed
-    gcTime: 0, // Don't keep old data in cache
+    staleTime: 30000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
     retry: 1, // Only retry once to avoid infinite loading
   });
 };
@@ -114,7 +114,7 @@ export const useJournalTags = (tagIds: string[] = []) => {
     queryKey: ['journal-tags', tagIds],
     queryFn: () => fetchJournalTags(tagIds),
     enabled: tagIds.length > 0,
-    staleTime: 0, // Always get fresh data
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
@@ -144,21 +144,24 @@ export const useJournalNarratives = (journalId: string | undefined) => {
     queryKey: ['journal-narratives', journalId],
     queryFn: () => fetchJournalNarratives(journalId!),
     enabled: !!journalId,
-    staleTime: 0, // Always get fresh data
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 
 export const invalidateJournalQueries = (queryClient: any, eventId?: string) => {
   console.log('Invalidating journal queries', eventId ? `for event: ${eventId}` : '');
   
-  // Invalidate all journal entries
-  queryClient.invalidateQueries({ queryKey: ['journal-entry'] });
-  
-  // Invalidate all calendar events (which include journal data)
-  queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
-  
-  // If we have a specific event ID, also invalidate related events for it
-  if (eventId) {
-    queryClient.invalidateQueries({ queryKey: ['related-events', eventId] });
-  }
+  // Use a delay to prevent race conditions and ensure invalidation happens after mutations complete
+  setTimeout(() => {
+    // Invalidate all journal entries
+    queryClient.invalidateQueries({ queryKey: ['journal-entry'] });
+    
+    // Invalidate all calendar events (which include journal data)
+    queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+    
+    // If we have a specific event ID, also invalidate related events for it
+    if (eventId) {
+      queryClient.invalidateQueries({ queryKey: ['related-events', eventId] });
+    }
+  }, 100);
 };
