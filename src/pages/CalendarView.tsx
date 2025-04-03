@@ -640,14 +640,15 @@ const CalendarView = () => {
                       <div className="flex flex-wrap gap-1 mt-2">
                         {eventTags.map((tag) => {
                           // If this is a journal entry, check if the tag is also in the event
-                          const isEventTag = selectedEvent?.hasJournal && selectedEvent.tags?.includes(tag.id);
+                          // Otherwise, all tags should be considered system tags (gray)
+                          const isSystemTag = selectedEvent?.hasJournal ? selectedEvent.tags?.includes(tag.id) : true;
                           return (
                             <Badge
                               key={tag.id}
                               variant="outline"
                               className={cn(
                                 "border-0 text-xs",
-                                isEventTag
+                                isSystemTag
                                   ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
                                   : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                               )}
