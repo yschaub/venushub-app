@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -175,13 +174,6 @@ const JournalEntries: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Journal Entries</h2>
-        <Button 
-          onClick={() => navigate('/dashboard/journal/create')}
-          className="flex items-center gap-2"
-        >
-          <PlusCircle className="h-4 w-4" />
-          New Entry
-        </Button>
       </div>
 
       <JournalEntryList
