@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,8 @@ import JournalEntryEditor from '@/components/JournalEntryEditor';
 
 const EditJournalEntry: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo;
   const [entry, setEntry] = useState<any>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -16,17 +17,28 @@ const EditJournalEntry: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Determine where to navigate when going back
+  const handleGoBack = () => {
+    if (returnTo?.path) {
+      // If we have a returnTo path (from calendar or narrative), use that
+      navigate(returnTo.path);
+    } else {
+      // Otherwise, go back to the journal entries page
+      navigate('/dashboard/journal');
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
-    
+
     const fetchEntryData = async () => {
       try {
         setIsLoading(true);
-        
+
         // First get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
-        
+
         if (!user) {
           toast({
             title: "Authentication Error",
@@ -36,7 +48,7 @@ const EditJournalEntry: React.FC = () => {
           navigate('/auth');
           return;
         }
-        
+
         // Fetch journal entry - directly query by ID and user_id
         const { data: entryData, error: entryError } = await supabase
           .from('journal_entries')
@@ -44,12 +56,12 @@ const EditJournalEntry: React.FC = () => {
           .eq('id', id)
           .eq('user_id', user.id)
           .maybeSingle();
-          
+
         if (entryError) {
           console.error('Error fetching entry:', entryError);
           throw entryError;
         }
-        
+
         if (!entryData) {
           toast({
             title: "Entry Not Found",
@@ -59,31 +71,31 @@ const EditJournalEntry: React.FC = () => {
           navigate('/dashboard/journal');
           return;
         }
-        
+
         console.log("Found journal entry:", entryData);
-        
+
         // Fetch tags for this entry
         const { data: entryTags, error: entryTagsError } = await supabase
           .from('journal_entry_tags')
           .select('tag_id')
           .eq('journal_entry_id', id);
-          
+
         if (entryTagsError) {
           console.error('Error fetching entry tags:', entryTagsError);
           throw entryTagsError;
         }
-        
+
         // Fetch all available tags
         const { data: tagsData, error: tagsError } = await supabase
           .from('system_tags')
           .select('*')
           .order('name');
-          
+
         if (tagsError) {
           console.error('Error fetching tags:', tagsError);
           throw tagsError;
         }
-        
+
         setEntry(entryData);
         setSelectedTags(entryTags.map((tag: any) => tag.tag_id));
         setTags(tagsData);
@@ -114,16 +126,16 @@ const EditJournalEntry: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate('/dashboard/journal')}
+        <Button
+          variant="ghost"
+          onClick={handleGoBack}
           className="flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Journal
+          Back {returnTo?.path?.includes('narratives') ? 'to Narrative' : 'to Journal'}
         </Button>
       </div>
-      
+
       <div className="mb-6">
         <h2 className="text-2xl font-semibold">
           {entry.title ? `Edit: ${entry.title}` : 'Edit Journal Entry'}
@@ -132,7 +144,7 @@ const EditJournalEntry: React.FC = () => {
           Update your entry and add annotations
         </p>
       </div>
-      
+
       <JournalEntryEditor
         mode="edit"
         entryId={id}
@@ -142,8 +154,8 @@ const EditJournalEntry: React.FC = () => {
           tags: selectedTags
         }}
         tags={tags}
-        onSuccess={() => navigate('/dashboard/journal')}
-        onCancel={() => navigate('/dashboard/journal')}
+        onSuccess={handleGoBack}
+        onCancel={handleGoBack}
       />
     </div>
   );

@@ -348,6 +348,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           navigate(returnTo.path, {
             state: { openEventId: returnTo.eventId }
           });
+        } else if (returnTo?.path?.includes('/dashboard/narratives/') && returnTo?.narrativeId) {
+          // Handle return to narrative view
+          navigate(returnTo.path);
         } else if (onSuccess) {
           onSuccess();
         } else {
@@ -435,6 +438,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
           navigate(returnTo.path, {
             state: { openEventId: returnTo.eventId }
           });
+        } else if (returnTo?.path?.includes('/dashboard/narratives/') && returnTo?.narrativeId) {
+          // Handle return to narrative view
+          navigate(returnTo.path);
         } else if (onSuccess) {
           onSuccess();
         } else {
@@ -458,6 +464,9 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
       navigate(returnTo.path, {
         state: { openEventId: returnTo.eventId }
       });
+    } else if (returnTo?.path?.includes('/dashboard/narratives/') && returnTo?.narrativeId) {
+      // Handle return to narrative view
+      navigate(returnTo.path);
     } else if (onCancel) {
       onCancel();
     } else {

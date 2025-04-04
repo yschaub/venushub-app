@@ -9,6 +9,7 @@ import { ChevronLeft, BookOpen, Edit, Tag, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useDeleteNarrative } from '@/hooks/use-narratives';
+import JournalEntryCard from '@/components/JournalEntryCard';
 
 interface Narrative {
     id: string;
@@ -27,8 +28,10 @@ interface Tag {
 interface JournalEntry {
     id: string;
     title: string;
-    content: string | null;
+    content: string;
     date_created: string;
+    tags: string[];
+    annotations?: any[];
 }
 
 const NarrativeShow: React.FC = () => {
@@ -41,6 +44,8 @@ const NarrativeShow: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [narrativeTags, setNarrativeTags] = useState<Tag[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [allTags, setAllTags] = useState<Tag[]>([]);
+    const [eventTags, setEventTags] = useState<{ [key: string]: string[] }>({});
 
     // Use the delete narrative mutation
     const deleteNarrativeMutation = useDeleteNarrative();
@@ -86,7 +91,16 @@ const NarrativeShow: React.FC = () => {
                 };
                 setNarrative(narrative);
 
-                // If narrative has required tags, fetch tag names and entries that match ALL those tags
+                // Fetch all tags for reference
+                const { data: tagsData, error: allTagsError } = await supabase
+                    .from('system_tags')
+                    .select('*')
+                    .order('name');
+
+                if (allTagsError) throw allTagsError;
+                setAllTags(tagsData || []);
+
+                // If narrative has required tags, fetch tag names
                 if (narrative.required_tags && narrative.required_tags.length > 0) {
                     // Fetch tag names
                     const { data: tagData, error: tagError } = await supabase
@@ -96,57 +110,91 @@ const NarrativeShow: React.FC = () => {
 
                     if (tagError) throw tagError;
                     setNarrativeTags(tagData || []);
+                }
 
-                    // First, get all journal entries for this user
-                    const { data: userEntriesData, error: userEntriesError } = await supabase
-                        .from('journal_entries')
-                        .select('id, title, content, date_created')
-                        .eq('user_id', user.id);
+                // Fetch journal entries that are directly associated with this narrative
+                const { data: narrativeJournalEntries, error: narrativeJournalError } = await supabase
+                    .from('narrative_journal_entries')
+                    .select('journal_entry_id')
+                    .eq('narrative_id', id);
 
-                    if (userEntriesError) throw userEntriesError;
+                if (narrativeJournalError) throw narrativeJournalError;
 
-                    if (!userEntriesData || userEntriesData.length === 0) {
-                        setEntries([]);
-                        setIsLoading(false);
-                        return;
-                    }
-
-                    // Get tags for all of the user's entries
-                    const { data: entryTagsData, error: entryTagsError } = await supabase
-                        .from('journal_entry_tags')
-                        .select('journal_entry_id, tag_id')
-                        .in('journal_entry_id', userEntriesData.map(entry => entry.id));
-
-                    if (entryTagsError) throw entryTagsError;
-
-                    // Group tags by entry id
-                    const entryTagsMap = new Map<string, Set<string>>();
-
-                    if (entryTagsData) {
-                        entryTagsData.forEach(item => {
-                            if (!entryTagsMap.has(item.journal_entry_id)) {
-                                entryTagsMap.set(item.journal_entry_id, new Set());
-                            }
-                            entryTagsMap.get(item.journal_entry_id)?.add(item.tag_id);
-                        });
-                    }
-
-                    // Filter entries that have ALL the required tags (AND logic)
-                    const matchingEntries = userEntriesData.filter(entry => {
-                        const entryTags = entryTagsMap.get(entry.id);
-                        if (!entryTags) return false;
-
-                        // Check if entry has ALL required tags
-                        return narrative.required_tags!.every(tagId => entryTags.has(tagId));
-                    });
-
-                    // Sort entries by date_created
-                    const sortedEntries = matchingEntries
-                        .sort((a, b) => new Date(b.date_created).getTime() - new Date(a.date_created).getTime());
-
-                    setEntries(sortedEntries);
-                } else {
+                if (!narrativeJournalEntries || narrativeJournalEntries.length === 0) {
                     setEntries([]);
+                    setIsLoading(false);
+                    return;
+                }
+
+                const entryIds = narrativeJournalEntries.map(e => e.journal_entry_id);
+
+                // Fetch full journal entries with annotations
+                const { data: entriesData, error: entriesError } = await supabase
+                    .from('journal_entries')
+                    .select(`
+                        *,
+                        journal_entry_tags (
+                            tag_id
+                        ),
+                        annotations:journal_entry_annotations (
+                            id,
+                            content,
+                            selected_text,
+                            created_at
+                        )
+                    `)
+                    .in('id', entryIds)
+                    .order('date_created', { ascending: false });
+
+                if (entriesError) throw entriesError;
+
+                // Process entries to include annotations properly
+                const processedEntries = entriesData.map(entry => {
+                    // Process the content to include created_at in the marks
+                    if (entry.content && entry.annotations) {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(entry.content, 'text/html');
+
+                        doc.querySelectorAll('mark[data-type="annotation"]').forEach(mark => {
+                            const id = mark.getAttribute('data-id');
+                            const annotation = entry.annotations.find((a: any) => a.id === id);
+                            if (annotation) {
+                                mark.setAttribute('data-created-at', annotation.created_at);
+                            }
+                        });
+
+                        entry.content = doc.body.innerHTML;
+                    }
+
+                    return {
+                        ...entry,
+                        tags: entry.journal_entry_tags.map((t: any) => t.tag_id)
+                    };
+                });
+
+                setEntries(processedEntries);
+
+                // Fetch event tags for entries that are linked to events
+                const entriesWithEvents = processedEntries.filter(entry => entry.event_id);
+                if (entriesWithEvents.length > 0) {
+                    const { data: eventsData, error: eventsError } = await supabase
+                        .from('events')
+                        .select('id, tags')
+                        .in('id', entriesWithEvents.map(entry => entry.event_id));
+
+                    if (eventsError) {
+                        console.error('Error fetching event tags:', eventsError);
+                    } else {
+                        // Create a map of entry IDs to their event tags
+                        const eventTagsMap: { [key: string]: string[] } = {};
+                        entriesWithEvents.forEach(entry => {
+                            const event = eventsData.find(e => e.id === entry.event_id);
+                            if (event?.tags) {
+                                eventTagsMap[entry.id] = event.tags;
+                            }
+                        });
+                        setEventTags(eventTagsMap);
+                    }
                 }
             } catch (error: any) {
                 console.error('Error fetching narrative and entries:', error);
@@ -204,6 +252,11 @@ const NarrativeShow: React.FC = () => {
         } finally {
             setDeleteDialogOpen(false);
         }
+    };
+
+    // Add a helper function to determine if a tag is an event tag
+    const isEventTag = (entryId: string, tagId: string) => {
+        return eventTags[entryId]?.includes(tagId) || false;
     };
 
     if (isLoading) {
@@ -308,27 +361,13 @@ const NarrativeShow: React.FC = () => {
             ) : (
                 <div className="space-y-4">
                     {entries.map((entry) => (
-                        <Card key={entry.id} className="hover:shadow-md transition-shadow">
-                            <CardHeader>
-                                <CardTitle className="text-base">{entry.title}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center text-muted-foreground text-sm">
-                                        <BookOpen className="h-4 w-4 mr-1" />
-                                        <span>Created on {format(new Date(entry.date_created), 'PPP')}</span>
-                                    </div>
-                                    <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="p-0 h-auto"
-                                        onClick={() => navigate(`/dashboard/journal/${entry.id}/edit`)}
-                                    >
-                                        View entry
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <JournalEntryCard
+                            key={entry.id}
+                            entry={entry}
+                            allTags={allTags}
+                            isEventTag={(entryId, tagId) => isEventTag(entryId, tagId)}
+                            narrativeId={id}
+                        />
                     ))}
                 </div>
             )}
