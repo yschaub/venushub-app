@@ -3,7 +3,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit } from 'lucide-react';
+import { Trash2, Edit, BookOpen, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { computePosition, flip, shift, offset } from '@floating-ui/dom';
@@ -124,9 +124,23 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
 
   if (entries.length === 0) {
     return (
-      <Card className="bg-muted/50">
-        <CardContent className="py-10 text-center">
-          <p>No journal entries yet. Create your first one!</p>
+      <Card className="bg-muted/50 flex flex-col items-center justify-center py-16 px-4">
+        <CardContent className="flex flex-col items-center text-center space-y-4 max-w-md">
+          <div className="bg-primary/10 p-4 rounded-full">
+            <BookOpen className="h-12 w-12 text-primary/80" />
+          </div>
+          <CardTitle className="text-xl">No journal entries yet</CardTitle>
+          <p className="text-muted-foreground">
+            Journal entries are created through calendar events. Head over to the calendar,
+            find an event, and create a journal entry to document your thoughts and reflections.
+          </p>
+          <Button
+            onClick={() => navigate('/dashboard/calendar')}
+            className="mt-2 flex items-center gap-2"
+          >
+            <Calendar className="h-4 w-4" />
+            Go to Calendar
+          </Button>
         </CardContent>
       </Card>
     );
