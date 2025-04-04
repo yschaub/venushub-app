@@ -124,22 +124,6 @@ const Narratives: React.FC = () => {
             Organize your astrological stories and insights
           </p>
         </div>
-        {!showEmptyState && categories.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              // Navigate to create narrative for the first category by default
-              if (categories.length > 0) {
-                navigate(`/dashboard/narratives/create/${categories[0].id}`);
-              }
-            }}
-            className="flex items-center gap-1"
-          >
-            <PlusCircle className="h-4 w-4" />
-            New Narrative
-          </Button>
-        )}
       </div>
 
       {showEmptyState ? (

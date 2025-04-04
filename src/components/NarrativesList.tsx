@@ -161,23 +161,36 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-lg font-medium">Narratives</h3>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate(`/dashboard/narratives/create/${categoryId}`)}
-          className="flex items-center gap-1"
-        >
-          <PlusCircle className="h-4 w-4" />
-          New Narrative
-        </Button>
-      </div>
+      {narratives.length > 0 && (
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-medium">Narratives</h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/dashboard/narratives/create/${categoryId}`)}
+            className="flex items-center gap-1"
+          >
+            <PlusCircle className="h-4 w-4" />
+            New Narrative
+          </Button>
+        </div>
+      )}
 
       {narratives.length === 0 ? (
-        <div className="text-sm text-muted-foreground text-center py-4">
-          No narratives in this category yet. Create one to get started.
-        </div>
+        <Card className="bg-muted/30 border-dashed">
+          <CardContent className="py-5 px-6 flex flex-row items-center justify-between">
+            <h3 className="font-medium text-base text-muted-foreground">No {categoryName.toLowerCase()} narratives yet</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/dashboard/narratives/create/${categoryId}`)}
+              className="flex items-center gap-1"
+            >
+              <PlusCircle className="h-4 w-4" />
+              New Narrative
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-6">
           {narratives.map((narrative) => (
