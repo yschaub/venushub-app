@@ -91,6 +91,11 @@ const NarrativeShow: React.FC = () => {
                 };
                 setNarrative(narrative);
 
+                // If the narrative has required tags, ensure journal entries are associated
+                if (narrative.required_tags && narrative.required_tags.length > 0) {
+                    await associateEntriesWithNarrative(narrative, user.id);
+                }
+
                 // Fetch all tags for reference
                 const { data: tagsData, error: allTagsError } = await supabase
                     .from('system_tags')
@@ -144,6 +149,7 @@ const NarrativeShow: React.FC = () => {
                         )
                     `)
                     .in('id', entryIds)
+                    .eq('user_id', user.id)
                     .order('date_created', { ascending: false });
 
                 if (entriesError) throw entriesError;
@@ -257,6 +263,84 @@ const NarrativeShow: React.FC = () => {
     // Add a helper function to determine if a tag is an event tag
     const isEventTag = (entryId: string, tagId: string) => {
         return eventTags[entryId]?.includes(tagId) || false;
+    };
+
+    // Function to associate journal entries with this narrative based on tags
+    const associateEntriesWithNarrative = async (narrative: Narrative, userId: string) => {
+        try {
+            if (!narrative.required_tags || narrative.required_tags.length === 0) return;
+
+            // Convert required_tags to a simple string[]
+            const requiredTags = narrative.required_tags as unknown as string[];
+
+            // Fetch journal entry tags with the required tags
+            const { data: journalEntryTagsData, error: tagsError } = await supabase
+                .from('journal_entry_tags')
+                .select('journal_entry_id, tag_id, journal_entries(user_id)')
+                .in('tag_id', requiredTags);
+
+            if (tagsError) {
+                console.error('Error fetching journal entry tags:', tagsError);
+                return;
+            }
+
+            // Group entries by journal_entry_id and count how many tags they have
+            const entryCounts: Record<string, string[]> = {};
+            journalEntryTagsData.forEach(item => {
+                // Only include entries belonging to the current user
+                if (item.journal_entries?.user_id === userId) {
+                    if (!entryCounts[item.journal_entry_id]) {
+                        entryCounts[item.journal_entry_id] = [];
+                    }
+                    entryCounts[item.journal_entry_id].push(item.tag_id);
+                }
+            });
+
+            // Find entries that have ALL required tags
+            const matchingEntryIds = Object.entries(entryCounts)
+                .filter(([_, tags]) => {
+                    // Check if this entry has ALL the required tags
+                    return requiredTags.every(tagId => tags.includes(tagId));
+                })
+                .map(([entryId]) => entryId);
+
+            if (matchingEntryIds.length === 0) return;
+
+            // Find which entries are already associated with this narrative
+            const { data: existingAssociations, error: existingError } = await supabase
+                .from('narrative_journal_entries')
+                .select('journal_entry_id')
+                .eq('narrative_id', narrative.id)
+                .in('journal_entry_id', matchingEntryIds);
+
+            if (existingError) {
+                console.error('Error fetching existing associations:', existingError);
+                return;
+            }
+
+            const existingEntryIds = existingAssociations.map(item => item.journal_entry_id);
+
+            // Find entries that need to be added
+            const entriesToAdd = matchingEntryIds.filter(id => !existingEntryIds.includes(id));
+
+            if (entriesToAdd.length === 0) return;
+
+            // Add new associations
+            const associationsToInsert = entriesToAdd.map(entryId => ({
+                narrative_id: narrative.id,
+                journal_entry_id: entryId
+            }));
+
+            const { error: insertError } = await supabase
+                .from('narrative_journal_entries')
+                .insert(associationsToInsert);
+
+            if (insertError) {
+                console.error('Error associating entries with narrative:', insertError);
+            }
+        } catch (error) {
+            console.error('Error in associateEntriesWithNarrative:', error);
+        }
     };
 
     if (isLoading) {

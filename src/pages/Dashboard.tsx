@@ -41,7 +41,7 @@ const Dashboard: React.FC = () => {
 
         const { data: journalEntryTagsData, error: tagsError } = await supabase
           .from('journal_entry_tags')
-          .select('journal_entry_id, tag_id')
+          .select('journal_entry_id, tag_id, journal_entries(user_id)')
           .in('tag_id', requiredTags);
 
         if (tagsError) {
@@ -52,10 +52,13 @@ const Dashboard: React.FC = () => {
         // Group entries by journal_entry_id and count how many tags they have
         const entryCounts: Record<string, string[]> = {};
         journalEntryTagsData.forEach(item => {
-          if (!entryCounts[item.journal_entry_id]) {
-            entryCounts[item.journal_entry_id] = [];
+          // Only include entries belonging to the current user
+          if (item.journal_entries?.user_id === userId) {
+            if (!entryCounts[item.journal_entry_id]) {
+              entryCounts[item.journal_entry_id] = [];
+            }
+            entryCounts[item.journal_entry_id].push(item.tag_id);
           }
-          entryCounts[item.journal_entry_id].push(item.tag_id);
         });
 
         // Find entries that have ALL required tags

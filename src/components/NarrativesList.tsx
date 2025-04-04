@@ -92,6 +92,7 @@ const NarrativesList = ({ categoryId, categoryName }: NarrativesListProps) => {
             .from('journal_entries')
             .select('id, title, content, date_created')
             .in('id', associationsData.map(a => a.journal_entry_id))
+            .eq('user_id', user.id)
             .order('date_created', { ascending: false });
 
           if (entriesError) {
