@@ -7,6 +7,7 @@ import { Trash2, Edit, BookOpen, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { computePosition, flip, shift, offset } from '@floating-ui/dom';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Tag {
   id: string;
@@ -85,6 +86,8 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
     created_at: string;
   } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hoveredAnnotation || !tooltipRef.current) return;
@@ -155,6 +158,19 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
     return eventTags[entryId]?.includes(tagId) || false;
   };
 
+  const handleDeleteClick = (id: string) => {
+    setEntryToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (entryToDelete) {
+      onDelete(entryToDelete);
+      setDeleteDialogOpen(false);
+      setEntryToDelete(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {entries.map(entry => {
@@ -176,7 +192,7 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onDelete(entry.id)}
+                    onClick={() => handleDeleteClick(entry.id)}
                     className="text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="h-5 w-5" />
@@ -243,6 +259,29 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog for Delete */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Journal Entry</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this journal entry? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex space-x-2 justify-end">
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
