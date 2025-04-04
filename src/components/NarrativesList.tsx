@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, BookOpen, ChevronRight, Tag } from 'lucide-react';
+import { PlusCircle, BookOpen, ChevronRight, BookText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface Tag {
