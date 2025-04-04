@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link, BookOpen, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Link, BookOpen, Tag, X } from 'lucide-react';
 import {
   Calendar,
   CalendarCurrentDate,
@@ -625,29 +625,42 @@ const CalendarView = () => {
         </Calendar>
 
         <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-          <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedEvent?.title}
-              </DialogTitle>
-              <DialogDescription>
-                {selectedEvent && (
-                  <>
-                    <div className="text-sm text-muted-foreground">
-                      {format(selectedEvent.start, 'MMMM d, yyyy')}
-                    </div>
-                    {eventTags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col border-0 shadow-xl p-0 bg-white dark:bg-[#191919] overflow-hidden">
+            <button
+              onClick={() => setIsSheetOpen(false)}
+              className="absolute right-4 top-4 rounded-full p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Close"
+            >
+            </button>
+            <div className="flex flex-col h-full">
+              {/* Header with title */}
+              <div className="p-6 pb-2">
+                <DialogTitle className="text-3xl font-bold mb-6">
+                  {selectedEvent?.title}
+                </DialogTitle>
+
+                {/* Properties section */}
+                <div className="flex flex-col gap-4 mb-4">
+                  <div className="flex items-center">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 w-28">Date</span>
+                    <span className="text-sm">
+                      {selectedEvent && format(selectedEvent.start, 'MMMM d, yyyy')}
+                    </span>
+                  </div>
+
+                  {/* Tags with property label */}
+                  {(eventTags.length > 0 || (selectedEvent?.tags && selectedEvent.tags.length > 0)) && (
+                    <div className="flex items-start">
+                      <span className="text-sm text-gray-500 dark:text-gray-400 w-28">Tags</span>
+                      <div className="flex flex-wrap gap-1.5">
                         {eventTags.map((tag) => {
-                          // If this is a journal entry, check if the tag is also in the event
-                          // Otherwise, all tags should be considered system tags (gray)
                           const isSystemTag = selectedEvent?.hasJournal ? selectedEvent.tags?.includes(tag.id) : true;
                           return (
                             <Badge
                               key={tag.id}
                               variant="outline"
                               className={cn(
-                                "border-0 text-xs",
+                                "border-0 text-xs rounded-md px-2 py-0.5",
                                 isSystemTag
                                   ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
                                   : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
@@ -658,169 +671,150 @@ const CalendarView = () => {
                           );
                         })}
                       </div>
-                    )}
-                    {!selectedEvent.hasJournal && selectedEvent.tags && selectedEvent.tags.length > 0 && eventTags.length === 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {selectedEvent.tags.map((tagId) => {
-                          const tag = eventTags.find(t => t.id === tagId);
-                          return tag ? (
-                            <Badge
-                              key={tagId}
-                              variant="outline"
-                              className="border-0 text-xs bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
-                            >
-                              {tag.name}
-                            </Badge>
-                          ) : null;
-                        })}
-                      </div>
-                    )}
+                    </div>
+                  )}
 
-                    {!loadingRelatedEvents && relatedEvents.length > 0 && (
-                      <div className="mt-3">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                          <Link className="h-3 w-3" />
-                          <span>Connected to:</span>
-                        </div>
-                        <div className="flex flex-wrap gap-x-2 text-sm">
-                          {relatedEvents.map((event, index) => (
-                            <React.Fragment key={event.id}>
-                              <button
-                                className="text-primary hover:underline"
-                                onClick={() => {
-                                  const calendarEvent = events.find(e => e.id === event.id);
-                                  if (calendarEvent) {
-                                    setSelectedEvent(calendarEvent);
-                                    fetchRelatedEvents(event.id);
-                                  }
-                                }}
-                              >
-                                {event.title}
-                              </button>
-                              {index < relatedEvents.length - 1 && <span className="text-muted-foreground">•</span>}
-                            </React.Fragment>
-                          ))}
-                        </div>
+                  {/* Related events with property label */}
+                  {!loadingRelatedEvents && relatedEvents.length > 0 && (
+                    <div className="flex items-start">
+                      <span className="text-sm text-gray-500 dark:text-gray-400 w-28">Connected to</span>
+                      <div className="flex flex-col gap-1.5">
+                        {relatedEvents.map((event) => (
+                          <button
+                            key={event.id}
+                            className="text-sm text-primary decoration-gray-500 underline underline-offset-2 text-left hover:no-underline"
+                            onClick={() => {
+                              const calendarEvent = events.find(e => e.id === event.id);
+                              if (calendarEvent) {
+                                setSelectedEvent(calendarEvent);
+                                fetchRelatedEvents(event.id);
+                              }
+                            }}
+                          >
+                            {event.title}
+                          </button>
+                        ))}
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {journalNarratives.length > 0 && (
-                      <div className="mt-3">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                          <BookOpen className="h-3 w-3" />
-                          <span>Part of narratives:</span>
-                        </div>
-                        <div className="flex flex-wrap gap-x-2 text-sm">
-                          {journalNarratives.map((narrative, index) => (
-                            <React.Fragment key={narrative.id}>
-                              <button
-                                className="text-primary hover:underline"
-                                onClick={() => navigate(`/dashboard/narratives/${narrative.id}`)}
-                              >
-                                {narrative.title}
-                              </button>
-                              {index < journalNarratives.length - 1 && <span className="text-muted-foreground">•</span>}
-                            </React.Fragment>
-                          ))}
-                        </div>
+                  {/* Narratives with property label */}
+                  {journalNarratives.length > 0 && (
+                    <div className="flex items-start">
+                      <span className="text-sm text-gray-500 dark:text-gray-400 w-28">Narratives</span>
+                      <div className="flex flex-col gap-1.5">
+                        {journalNarratives.map((narrative) => (
+                          <button
+                            key={narrative.id}
+                            className="text-sm text-primary decoration-gray-500 underline underline-offset-2 text-left hover:no-underline"
+                            onClick={() => navigate(`/dashboard/narratives/${narrative.id}`)}
+                          >
+                            {narrative.title}
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  </>
-                )}
-              </DialogDescription>
-            </DialogHeader>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-            <div className="flex-1 overflow-y-auto pr-6 -mr-6">
-              {selectedEvent?.primary_event && (
-                <div className="mt-4">
-                  {selectedEvent.hasJournal ? (
-                    <div className="space-y-4">
-                      {loadingJournal ? (
-                        <div className="flex items-center justify-center py-4">
-                          <p className="text-sm text-muted-foreground">Loading journal entry...</p>
-                        </div>
-                      ) : journalEntry ? (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-medium flex items-center gap-2">
-                              <BookOpen className="h-4 w-4" />
-                              Journal Entry
-                            </h3>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/dashboard/journal/${journalEntry.id}/edit`, {
-                                state: {
-                                  returnTo: {
-                                    path: '/dashboard/calendar',
-                                    eventId: selectedEvent?.id
-                                  }
-                                }
-                              })}
-                            >
-                              Edit
-                            </Button>
+              <Separator />
+
+              {/* Journal entry section */}
+              <div className="flex-1 px-6 py-6 overflow-y-auto">
+                {selectedEvent?.primary_event && (
+                  <div>
+                    {selectedEvent.hasJournal ? (
+                      <div className="space-y-4">
+                        {loadingJournal ? (
+                          <div className="flex items-center justify-center py-4">
+                            <p className="text-sm text-muted-foreground">Loading journal entry...</p>
                           </div>
-                          <div className="rounded-lg border bg-card">
-                            <div className="p-4 prose prose-sm max-w-none [&>div:first-child>p]:mt-0 [&>div:last-child>p]:mb-0">
-                              {journalEntry.content.split(/(<p>.*?<\/p>)/).filter(Boolean).map((paragraph, index) => {
-                                if (paragraph.startsWith('<p>')) {
-                                  const { content } = parseContent(paragraph);
-                                  return (
-                                    <div key={index}>
-                                      <p
-                                        dangerouslySetInnerHTML={{ __html: content }}
-                                        onMouseOver={(e) => {
-                                          const target = e.target as HTMLElement;
-                                          const mark = target.closest('mark[data-annotation-ref]') as HTMLElement;
-                                          if (mark) {
-                                            const content = mark.getAttribute('data-content');
-                                            const createdAt = mark.getAttribute('data-created-at');
-                                            if (content && createdAt) {
-                                              setHoveredAnnotation({
-                                                element: mark,
-                                                content,
-                                                created_at: createdAt
-                                              });
-                                            }
-                                          }
-                                        }}
-                                        onMouseOut={() => {
-                                          setHoveredAnnotation(null);
-                                        }}
-                                      />
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              })}
+                        ) : journalEntry ? (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-lg font-medium flex items-center gap-2">
+                                <BookOpen className="h-4 w-4" />
+                                Journal Entry
+                              </h3>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate(`/dashboard/journal/${journalEntry.id}/edit`, {
+                                  state: {
+                                    returnTo: {
+                                      path: '/dashboard/calendar',
+                                      eventId: selectedEvent?.id
+                                    }
+                                  }
+                                })}
+                              >
+                                Edit
+                              </Button>
                             </div>
-                          </div>
-                          {hoveredAnnotation && (
-                            <div
-                              ref={tooltipRef}
-                              className="fixed z-50 px-2 py-1 text-sm rounded shadow-lg border bg-white dark:bg-gray-800 text-foreground max-w-[300px]"
-                            >
-                              <div className="mb-1">{hoveredAnnotation.content}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(new Date(hoveredAnnotation.created_at), { addSuffix: true })}
+                            <div className="rounded-lg">
+                              <div className="prose prose-sm max-w-none [&>div:first-child>p]:mt-0 [&>div:last-child>p]:mb-0">
+                                {journalEntry.content.split(/(<p>.*?<\/p>)/).filter(Boolean).map((paragraph, index) => {
+                                  if (paragraph.startsWith('<p>')) {
+                                    const { content } = parseContent(paragraph);
+                                    return (
+                                      <div key={index}>
+                                        <p
+                                          dangerouslySetInnerHTML={{ __html: content }}
+                                          onMouseOver={(e) => {
+                                            const target = e.target as HTMLElement;
+                                            const mark = target.closest('mark[data-annotation-ref]') as HTMLElement;
+                                            if (mark) {
+                                              const content = mark.getAttribute('data-content');
+                                              const createdAt = mark.getAttribute('data-created-at');
+                                              if (content && createdAt) {
+                                                setHoveredAnnotation({
+                                                  element: mark,
+                                                  content,
+                                                  created_at: createdAt
+                                                });
+                                              }
+                                            }
+                                          }}
+                                          onMouseOut={() => {
+                                            setHoveredAnnotation(null);
+                                          }}
+                                        />
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })}
                               </div>
                             </div>
-                          )}
-                        </>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex items-center gap-1 w-full"
-                      onClick={handleJournalAction}
-                    >
-                      <BookOpen className="h-3.5 w-3.5" />
-                      Journal About This
-                    </Button>
-                  )}
+                          </>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center gap-1 w-full"
+                        onClick={handleJournalAction}
+                      >
+                        <BookOpen className="h-3.5 w-3.5" />
+                        Journal About This
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Tooltip for annotations */}
+              {hoveredAnnotation && (
+                <div
+                  ref={tooltipRef}
+                  className="fixed z-50 px-2 py-1 text-sm rounded shadow-lg border bg-white dark:bg-gray-800 text-foreground max-w-[300px]"
+                >
+                  <div className="mb-1">{hoveredAnnotation.content}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(hoveredAnnotation.created_at), { addSuffix: true })}
+                  </div>
                 </div>
               )}
             </div>
