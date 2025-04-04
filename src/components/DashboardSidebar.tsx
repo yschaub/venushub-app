@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, BookText, LogOut, BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,28 +16,19 @@ import {
   SidebarMenuSubButton
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import { useNarrativesForSidebar, useCategoriesForSidebar } from '@/hooks/use-narratives';
 
 interface DashboardSidebarProps {
   userEmail: string | null;
 }
 
-interface NarrativeCategory {
-  id: string;
-  name: string;
-  type: 'eclipse' | 'return' | 'transit' | 'custom';
-}
-
-interface Narrative {
-  id: string;
-  title: string;
-  category_id: string;
-}
-
 const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<NarrativeCategory[]>([]);
-  const [narratives, setNarratives] = useState<Narrative[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  // Use React Query hooks
+  const { data: categories = [], isLoading: isCategoriesLoading } = useCategoriesForSidebar();
+  const { data: narratives = [], isLoading: isNarrativesLoading } = useNarrativesForSidebar();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -48,68 +39,15 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
     navigate(path);
   };
 
-  const fetchNarratives = async () => {
-    try {
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) return;
-
-      // Fetch narratives
-      const { data: narrativesData, error: narrativesError } = await supabase
-        .from('narratives')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (narrativesError) throw narrativesError;
-      setNarratives(narrativesData || []);
-    } catch (error) {
-      console.error('Error fetching narratives:', error);
-    }
-  };
-
-  useEffect(() => {
-    const fetchCategoriesAndNarratives = async () => {
-      try {
-        // Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-        if (!user) return;
-
-        // Fetch categories
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from('narrative_categories')
-          .select('*')
-          .eq('is_active', true)
-          .eq('user_id', user.id)
-          .order('name');
-
-        if (categoriesError) throw categoriesError;
-        setCategories(categoriesData || []);
-
-        // Set all categories as expanded by default
-        const expandedState = (categoriesData || []).reduce((acc, category) => ({
-          ...acc,
-          [category.id]: true
-        }), {});
-        setExpandedCategories(expandedState);
-
-        // Fetch narratives
-        await fetchNarratives();
-      } catch (error) {
-        console.error('Error fetching categories and narratives:', error);
-      }
-    };
-
-    fetchCategoriesAndNarratives();
-  }, []);
-
   const toggleCategory = (categoryId: string) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [categoryId]: !prev[categoryId]
-    }));
+    setExpandedCategories(prev => {
+      // If this is the first time toggling, set it to false (since default is expanded)
+      const currentValue = prev[categoryId] !== undefined ? prev[categoryId] : true;
+      return {
+        ...prev,
+        [categoryId]: !currentValue
+      };
+    });
   };
 
   const getCategoryIcon = (type: string) => {
@@ -127,8 +65,14 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
     }
   };
 
-  const handleCreateNarrative = (categoryId: string, categoryName: string) => {
+  const handleCreateNarrative = (categoryId: string) => {
     navigate(`/dashboard/narratives/create/${categoryId}`);
+  };
+
+  // Check if a category is expanded
+  const isCategoryExpanded = (categoryId: string) => {
+    return expandedCategories[categoryId] !== undefined ?
+      expandedCategories[categoryId] : true; // Default to expanded
   };
 
   return (
@@ -172,7 +116,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
             </SidebarMenuButton>
           </SidebarMenuItem>
 
-          {categories.length > 0 && (
+          {!isCategoriesLoading && categories.length > 0 && (
             <SidebarMenuSub>
               {categories.map((category) => (
                 <SidebarMenuSubItem key={category.id}>
@@ -184,14 +128,14 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
                       <span>{getCategoryIcon(category.type)}</span>
                       <span>{category.name}</span>
                     </div>
-                    {expandedCategories[category.id] ?
+                    {isCategoryExpanded(category.id) ?
                       <ChevronDown className="h-4 w-4" /> :
                       <ChevronRight className="h-4 w-4" />
                     }
                   </SidebarMenuSubButton>
-                  {expandedCategories[category.id] && (
+                  {isCategoryExpanded(category.id) && (
                     <SidebarMenuSub>
-                      {narratives
+                      {!isNarrativesLoading && narratives
                         .filter(n => n.category_id === category.id)
                         .map(narrative => (
                           <SidebarMenuSubItem key={narrative.id}>
@@ -206,7 +150,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ userEmail }) => {
                         ))}
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton
-                          onClick={() => handleCreateNarrative(category.id, category.name)}
+                          onClick={() => handleCreateNarrative(category.id)}
                           size="sm"
                           className="text-muted-foreground hover:text-primary cursor-pointer"
                         >

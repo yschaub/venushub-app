@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { ChevronLeft, BookOpen, Edit, Tag, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useDeleteNarrative } from '@/hooks/use-narratives';
 
 interface Narrative {
     id: string;
@@ -40,6 +41,9 @@ const NarrativeShow: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [narrativeTags, setNarrativeTags] = useState<Tag[]>([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+    // Use the delete narrative mutation
+    const deleteNarrativeMutation = useDeleteNarrative();
 
     useEffect(() => {
         const fetchNarrativeAndEntries = async () => {
@@ -181,22 +185,15 @@ const NarrativeShow: React.FC = () => {
         if (!id) return;
 
         try {
-            // Delete the narrative
-            const { error } = await supabase
-                .from('narratives')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
+            await deleteNarrativeMutation.mutateAsync(id);
 
             toast({
                 title: "Success",
                 description: "Narrative deleted successfully",
             });
 
-            // Navigate back to narratives page and refresh the page to update the sidebar
+            // Navigate back to narratives page
             navigate('/dashboard/narratives');
-            window.location.reload();
         } catch (error: any) {
             console.error('Error deleting narrative:', error);
             toast({

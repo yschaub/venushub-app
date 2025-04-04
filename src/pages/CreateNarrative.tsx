@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, ChevronLeft, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
+import { useCreateNarrative, useUpdateNarrative } from '@/hooks/use-narratives';
 
 interface Tag {
     id: string;
@@ -37,6 +38,10 @@ const CreateNarrative = () => {
     const [categoryName, setCategoryName] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [matchingEntries, setMatchingEntries] = useState<JournalEntry[]>([]);
+
+    // Use the mutation hooks
+    const createNarrativeMutation = useCreateNarrative();
+    const updateNarrativeMutation = useUpdateNarrative();
 
     useEffect(() => {
         if (categoryId) {
@@ -225,16 +230,13 @@ const CreateNarrative = () => {
             }
 
             if (editId) {
-                const { error } = await supabase
-                    .from('narratives')
-                    .update({
-                        title,
-                        required_tags: selectedTags,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', editId);
-
-                if (error) throw error;
+                await updateNarrativeMutation.mutateAsync({
+                    id: editId,
+                    title,
+                    required_tags: selectedTags,
+                    category_id: categoryId!, // Using non-null assertion since we know it exists
+                    user_id: user.id
+                });
 
                 toast({
                     title: "Success",
@@ -244,18 +246,12 @@ const CreateNarrative = () => {
                 // Navigate to the narrative's page
                 navigate(`/dashboard/narratives/${editId}`);
             } else {
-                const { data, error } = await supabase
-                    .from('narratives')
-                    .insert({
-                        title,
-                        category_id: categoryId,
-                        user_id: user.id,
-                        required_tags: selectedTags
-                    })
-                    .select()
-                    .single();
-
-                if (error) throw error;
+                const newNarrative = await createNarrativeMutation.mutateAsync({
+                    title,
+                    category_id: categoryId!,
+                    user_id: user.id,
+                    required_tags: selectedTags
+                });
 
                 toast({
                     title: "Success",
@@ -263,9 +259,8 @@ const CreateNarrative = () => {
                 });
 
                 // Navigate to the narrative's page
-                navigate(`/dashboard/narratives/${data.id}`);
+                navigate(`/dashboard/narratives/${newNarrative.id}`);
             }
-
         } catch (error: any) {
             console.error('Error saving narrative:', error);
             toast({
