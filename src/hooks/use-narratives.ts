@@ -126,6 +126,15 @@ export const useDeleteNarrative = () => {
 
     return useMutation({
         mutationFn: async (id: string) => {
+            // First, delete any associations in narrative_journal_entries
+            const { error: associationsError } = await supabase
+                .from('narrative_journal_entries')
+                .delete()
+                .eq('narrative_id', id);
+
+            if (associationsError) throw associationsError;
+
+            // Then delete the narrative itself
             const { error } = await supabase
                 .from('narratives')
                 .delete()
