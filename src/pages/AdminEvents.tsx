@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -20,6 +21,8 @@ interface Event {
     id: string;
     title: string;
     date: string;
+    start_date: string;
+    end_date: string;
     primary_event: boolean;
     tags: string[] | null;
     connectedEvents?: ConnectedEvent[];
