@@ -68,6 +68,7 @@ const AdminEvents = () => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [connectionModalSearch, setConnectionModalSearch] = useState("");
+    const [deleteModalSearch, setDeleteModalSearch] = useState("");
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selectedEventForConnection, setSelectedEventForConnection] = useState<Event | null>(null);
     const [tagSearchQuery, setTagSearchQuery] = useState("");
@@ -392,13 +393,20 @@ const AdminEvents = () => {
 
     // Filter events for connection modal
     const getFilteredEventsForConnection = () => {
-        if (!connectionModalSearch.trim()) {
-            return allEvents.filter(ev => ev.id !== selectedEventForConnection?.id);
-        }
+        const currentEvent = selectedEventForConnection || selectedEvent;
+        if (!currentEvent) return [];
 
-        const query = connectionModalSearch.toLowerCase();
+        const query = connectionModalSearch.trim().toLowerCase();
+        const currentEventId = currentEvent.id;
+
         return allEvents.filter(event => {
-            if (event.id === selectedEventForConnection?.id) return false;
+            // Always exclude the current event
+            if (event.id === currentEventId) return false;
+
+            // If no search query, return all other events
+            if (!query) return true;
+
+            // Filter based on search query
             const titleMatch = event.title.toLowerCase().includes(query);
             const dateMatch = format(new Date(event.date), 'MMMM d, yyyy').toLowerCase().includes(query);
             return titleMatch || dateMatch;
@@ -569,6 +577,20 @@ const AdminEvents = () => {
             setSelectedEvent(null);
             setTempSelectedTags([]);
         }
+    };
+
+    // Filter events for delete modal
+    const getFilteredEventsForDelete = () => {
+        if (!deleteModalSearch.trim()) {
+            return allEvents;
+        }
+
+        const query = deleteModalSearch.toLowerCase();
+        return allEvents.filter(event => {
+            const titleMatch = event.title.toLowerCase().includes(query);
+            const dateMatch = format(new Date(event.date), 'MMMM d, yyyy').toLowerCase().includes(query);
+            return titleMatch || dateMatch;
+        });
     };
 
     if (loading) {
@@ -895,7 +917,10 @@ const AdminEvents = () => {
                                                                 variant="outline"
                                                                 size="sm"
                                                                 className="h-8"
-                                                                onClick={() => setSelectedEvent(event)}
+                                                                onClick={() => {
+                                                                    setSelectedEventForConnection(event);
+                                                                    setConnectionModalSearch("");
+                                                                }}
                                                             >
                                                                 <Plus className="h-4 w-4 mr-2" />
                                                                 Add Connection
@@ -905,7 +930,7 @@ const AdminEvents = () => {
                                                             <DialogHeader>
                                                                 <DialogTitle>Add Connection</DialogTitle>
                                                                 <DialogDescription>
-                                                                    Search for an event to connect with "{event.title}"
+                                                                    Search for an event to connect with "{selectedEventForConnection?.title || selectedEvent?.title}"
                                                                 </DialogDescription>
                                                             </DialogHeader>
                                                             <div className="relative">
@@ -913,19 +938,22 @@ const AdminEvents = () => {
                                                                 <Input
                                                                     placeholder="Search events..."
                                                                     className="pl-8"
-                                                                    value={searchQuery}
-                                                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                                                    value={connectionModalSearch}
+                                                                    onChange={(e) => setConnectionModalSearch(e.target.value)}
                                                                 />
                                                             </div>
                                                             <ScrollArea className="h-[200px]">
                                                                 <div className="space-y-2">
-                                                                    {events.map(ev => (
+                                                                    {getFilteredEventsForConnection().map(ev => (
                                                                         <div
                                                                             key={ev.id}
                                                                             className="flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer"
                                                                             onClick={() => {
-                                                                                addConnection(event.id, ev.id);
-                                                                                setSearchQuery("");
+                                                                                if (selectedEventForConnection) {
+                                                                                    addConnection(selectedEventForConnection.id, ev.id);
+                                                                                    setConnectionModalSearch("");
+                                                                                    setSelectedEventForConnection(null);
+                                                                                }
                                                                             }}
                                                                         >
                                                                             <span>{ev.title}</span>
@@ -940,8 +968,8 @@ const AdminEvents = () => {
                                                                 <Button
                                                                     variant="outline"
                                                                     onClick={() => {
-                                                                        setSearchQuery("");
-                                                                        setSelectedEvent(null);
+                                                                        setConnectionModalSearch("");
+                                                                        setSelectedEventForConnection(null);
                                                                     }}
                                                                 >
                                                                     Cancel
@@ -1001,12 +1029,17 @@ const AdminEvents = () => {
             </div>
 
             {/* Add Connection Dialog */}
-            <Dialog open={selectedEventForConnection !== null}>
+            <Dialog open={selectedEventForConnection !== null} onOpenChange={(open) => {
+                if (!open) {
+                    setSelectedEventForConnection(null);
+                    setConnectionModalSearch("");
+                }
+            }}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Add Connection</DialogTitle>
                         <DialogDescription>
-                            Search for an event to connect with "{selectedEventForConnection?.title}"
+                            Search for an event to connect with "{selectedEventForConnection?.title || selectedEvent?.title}"
                         </DialogDescription>
                     </DialogHeader>
                     <div className="relative">
@@ -1044,8 +1077,8 @@ const AdminEvents = () => {
                         <Button
                             variant="outline"
                             onClick={() => {
-                                setConnectionModalSearch("");
                                 setSelectedEventForConnection(null);
+                                setConnectionModalSearch("");
                             }}
                         >
                             Cancel
@@ -1175,13 +1208,13 @@ const AdminEvents = () => {
                         <Input
                             placeholder="Search events..."
                             className="pl-8"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            value={deleteModalSearch}
+                            onChange={(e) => setDeleteModalSearch(e.target.value)}
                         />
                     </div>
                     <ScrollArea className="h-[200px]">
                         <div className="space-y-2">
-                            {events.map(ev => (
+                            {getFilteredEventsForDelete().map(ev => (
                                 <div
                                     key={ev.id}
                                     className={cn(
@@ -1206,7 +1239,7 @@ const AdminEvents = () => {
                             onClick={() => {
                                 setEventToDelete(null);
                                 setIsDeleteEventModalOpen(false);
-                                setSearchQuery("");
+                                setDeleteModalSearch("");
                             }}
                         >
                             Cancel
