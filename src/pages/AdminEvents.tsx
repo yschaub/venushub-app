@@ -21,6 +21,12 @@ interface Event {
     end_date: string;
     primary_event: boolean;
     tags: string[] | null;
+    connectedEvents?: ConnectedEvent[];
+}
+
+interface ConnectedEvent {
+    id: string;
+    title: string;
 }
 
 interface SystemTag {
@@ -75,7 +81,56 @@ const AdminEvents = () => {
                     }
                 }
 
-                setEvents(eventsData || []);
+                // Convert DB events to our Event interface with empty connectedEvents arrays
+                const typedEvents: Event[] = eventsData?.map(event => ({
+                    ...event,
+                    connectedEvents: []
+                })) || [];
+
+                // Fetch event relationships
+                const { data: relationships, error: relationshipsError } = await supabase
+                    .from('event_relationships')
+                    .select('*');
+
+                if (relationshipsError) {
+                    console.error('Error fetching event relationships:', relationshipsError);
+                    setEvents(typedEvents);
+                } else {
+                    // Create a map for quick lookups
+                    const eventsMap: Record<string, Event> = {};
+                    typedEvents.forEach(event => {
+                        eventsMap[event.id] = event;
+                    });
+
+                    // Process relationships
+                    relationships?.forEach(rel => {
+                        const event = eventsMap[rel.event_id];
+                        const relatedEvent = eventsMap[rel.related_event_id];
+
+                        if (event && relatedEvent) {
+                            // Add related event to the event
+                            event.connectedEvents?.push({
+                                id: relatedEvent.id,
+                                title: relatedEvent.title
+                            });
+
+                            // Add event to the related event (bi-directional relationship)
+                            // Check if this relationship already exists in the opposite direction
+                            const alreadyConnected = relatedEvent.connectedEvents?.some(
+                                ce => ce.id === event.id
+                            );
+
+                            if (!alreadyConnected) {
+                                relatedEvent.connectedEvents?.push({
+                                    id: event.id,
+                                    title: event.title
+                                });
+                            }
+                        }
+                    });
+
+                    setEvents(Object.values(eventsMap));
+                }
             } catch (error) {
                 console.error('Error in fetchEvents:', error);
             } finally {
@@ -105,6 +160,7 @@ const AdminEvents = () => {
                             <TableHead>Date</TableHead>
                             <TableHead>Type</TableHead>
                             <TableHead>Tags</TableHead>
+                            <TableHead>Connected Events</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -132,6 +188,22 @@ const AdminEvents = () => {
                                             </Badge>
                                         ))}
                                     </div>
+                                </TableCell>
+                                <TableCell>
+                                    {event.connectedEvents && event.connectedEvents.length > 0 ? (
+                                        <div className="flex flex-col gap-1">
+                                            {event.connectedEvents.map(connected => (
+                                                <span
+                                                    key={connected.id}
+                                                    className="text-sm text-primary hover:underline"
+                                                >
+                                                    {connected.title}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <span className="text-sm text-muted-foreground">None</span>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}
