@@ -3,11 +3,15 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, BookOpen, Calendar } from 'lucide-react';
+import { Trash2, Edit, BookOpen, Calendar, BookmarkPlus, Bookmark } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { computePosition, flip, shift, offset } from '@floating-ui/dom';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Tag {
   id: string;
@@ -22,6 +26,7 @@ interface JournalEntry {
   date: string;
   tags: string[]; // This now contains tag UUIDs instead of tag names
   event_id?: string; // Add this to track if the entry is linked to an event
+  isInNarrative?: boolean; // Add this field
 }
 
 interface JournalEntryListProps {
@@ -73,13 +78,15 @@ const parseContent = (content: string) => {
 };
 
 const JournalEntryList: React.FC<JournalEntryListProps> = ({
-  entries,
+  entries: initialEntries,
   isLoading,
   onDelete,
   tags,
   eventTags = {}
 }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [narrativeStatus, setNarrativeStatus] = useState<Record<string, boolean>>({});
   const [hoveredAnnotation, setHoveredAnnotation] = useState<{
     element: HTMLElement;
     content: string;
@@ -88,6 +95,10 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+  const [narrativesDialogOpen, setNarrativesDialogOpen] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [narratives, setNarratives] = useState<any[]>([]);
+  const [isLoadingNarratives, setIsLoadingNarratives] = useState(false);
 
   useEffect(() => {
     if (!hoveredAnnotation || !tooltipRef.current) return;
@@ -121,11 +132,97 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
     };
   }, [hoveredAnnotation]);
 
+  // Add new useEffect to handle fetching narratives when selectedEntry changes
+  useEffect(() => {
+    if (narrativesDialogOpen && selectedEntry) {
+      fetchNarratives();
+    }
+  }, [narrativesDialogOpen, selectedEntry]);
+
+  // Update the useEffect to store only narrative status
+  useEffect(() => {
+    const checkNarrativeAssociations = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get all narrative associations
+        const { data: associations, error: associationsError } = await supabase
+          .from('narrative_journal_entries')
+          .select('journal_entry_id')
+          .in('journal_entry_id', initialEntries.map(e => e.id));
+
+        if (associationsError) throw associationsError;
+
+        // Get all narratives to check smart associations
+        const { data: narratives, error: narrativesError } = await supabase
+          .from('narratives')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (narrativesError) throw narrativesError;
+
+        // Get all entry tags
+        const { data: entryTags, error: tagsError } = await supabase
+          .from('journal_entry_tags')
+          .select('journal_entry_id, tag_id')
+          .in('journal_entry_id', initialEntries.map(e => e.id));
+
+        if (tagsError) throw tagsError;
+
+        // Group tags by entry
+        const entryTagsMap = entryTags?.reduce((acc, { journal_entry_id, tag_id }) => {
+          if (!acc[journal_entry_id]) {
+            acc[journal_entry_id] = [];
+          }
+          acc[journal_entry_id].push(tag_id);
+          return acc;
+        }, {} as Record<string, string[]>);
+
+        // Set of entries that are in narratives (either manually or through tags)
+        const entriesInNarratives = new Set<string>();
+
+        // Add manually associated entries
+        associations?.forEach(({ journal_entry_id }) => {
+          entriesInNarratives.add(journal_entry_id);
+        });
+
+        // Check smart associations
+        narratives?.forEach(narrative => {
+          if (narrative.required_tags && narrative.required_tags.length > 0) {
+            initialEntries.forEach(entry => {
+              const entryTags = entryTagsMap[entry.id] || [];
+              const hasAllRequiredTags = narrative.required_tags.every(tagId =>
+                entryTags.includes(tagId)
+              );
+              if (hasAllRequiredTags) {
+                entriesInNarratives.add(entry.id);
+              }
+            });
+          }
+        });
+
+        // Update narrative status
+        const newStatus: Record<string, boolean> = {};
+        initialEntries.forEach(entry => {
+          newStatus[entry.id] = entriesInNarratives.has(entry.id);
+        });
+        setNarrativeStatus(newStatus);
+      } catch (error) {
+        console.error('Error checking narrative associations:', error);
+      }
+    };
+
+    if (initialEntries.length > 0) {
+      checkNarrativeAssociations();
+    }
+  }, [initialEntries]);
+
   if (isLoading) {
     return <div className="py-20 text-center">Loading journal entries...</div>;
   }
 
-  if (entries.length === 0) {
+  if (initialEntries.length === 0) {
     return (
       <Card className="bg-muted/50 flex flex-col items-center justify-center py-16 px-4">
         <CardContent className="flex flex-col items-center text-center space-y-4 max-w-md">
@@ -171,9 +268,171 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
     }
   };
 
+  const handleManageNarratives = (entry: JournalEntry) => {
+    setSelectedEntry(entry);
+    setNarrativesDialogOpen(true);
+  };
+
+  const fetchNarratives = async () => {
+    try {
+      setIsLoadingNarratives(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to manage narratives",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!selectedEntry) {
+        toast({
+          title: "Error",
+          description: "No journal entry selected",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Fetch all narratives for the user
+      const { data: narrativesData, error: narrativesError } = await supabase
+        .from('narratives')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (narrativesError) throw narrativesError;
+
+      // Fetch existing manual narrative associations for this entry
+      const { data: existingAssociations, error: associationsError } = await supabase
+        .from('narrative_journal_entries')
+        .select('narrative_id')
+        .eq('journal_entry_id', selectedEntry.id);
+
+      if (associationsError) throw associationsError;
+
+      // Create a Set of manually associated narrative IDs
+      const manualNarrativeIds = new Set(existingAssociations?.map(a => a.narrative_id) || []);
+
+      // Check for smart tag-based associations
+      const smartNarrativeIds = new Set<string>();
+
+      // Get all tags for this entry
+      const { data: entryTags, error: tagsError } = await supabase
+        .from('journal_entry_tags')
+        .select('tag_id')
+        .eq('journal_entry_id', selectedEntry.id);
+
+      if (tagsError) throw tagsError;
+
+      const entryTagIds = entryTags?.map(t => t.tag_id) || [];
+
+      // For each narrative, check if its required tags match the entry's tags
+      for (const narrative of narrativesData) {
+        if (narrative.required_tags && narrative.required_tags.length > 0) {
+          // Check if the entry has ALL the required tags for this narrative
+          const hasAllRequiredTags = narrative.required_tags.every(tagId =>
+            entryTagIds.includes(tagId)
+          );
+
+          if (hasAllRequiredTags) {
+            smartNarrativeIds.add(narrative.id);
+          }
+        }
+      }
+
+      // Transform narratives to include selection state
+      // An entry is considered "selected" if it's either manually associated OR smart-associated
+      const transformedNarratives = narrativesData.map(narrative => ({
+        ...narrative,
+        isSelected: manualNarrativeIds.has(narrative.id) || smartNarrativeIds.has(narrative.id),
+        isSmartAssociated: smartNarrativeIds.has(narrative.id)
+      }));
+
+      setNarratives(transformedNarratives);
+    } catch (error) {
+      console.error('Error fetching narratives:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load narratives",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingNarratives(false);
+    }
+  };
+
+  const handleNarrativeToggle = (narrativeId: string) => {
+    setNarratives(prevNarratives =>
+      prevNarratives.map(narrative =>
+        narrative.id === narrativeId
+          ? { ...narrative, isSelected: !narrative.isSelected }
+          : narrative
+      )
+    );
+  };
+
+  const handleSaveNarratives = async () => {
+    try {
+      if (!selectedEntry) return;
+
+      // Get selected narratives
+      const selectedNarratives = narratives.filter(n => n.isSelected && !n.isSmartAssociated);
+      const selectedNarrativeIds = selectedNarratives.map(n => n.id);
+
+      // First, remove all existing associations for this entry
+      const { error: deleteError } = await supabase
+        .from('narrative_journal_entries')
+        .delete()
+        .eq('journal_entry_id', selectedEntry.id);
+
+      if (deleteError) throw deleteError;
+
+      // Then, add new associations for selected narratives
+      if (selectedNarrativeIds.length > 0) {
+        const { error: insertError } = await supabase
+          .from('narrative_journal_entries')
+          .insert(
+            selectedNarrativeIds.map(narrativeId => ({
+              narrative_id: narrativeId,
+              journal_entry_id: selectedEntry.id
+            }))
+          );
+
+        if (insertError) throw insertError;
+      }
+
+      // Update the narrative status for this entry
+      const hasManualAssociation = selectedNarrativeIds.length > 0;
+      const hasSmartAssociation = narratives.some(n =>
+        n.isSmartAssociated && n.isSelected && !selectedNarrativeIds.includes(n.id)
+      );
+
+      setNarrativeStatus(prev => ({
+        ...prev,
+        [selectedEntry.id]: hasManualAssociation || hasSmartAssociation
+      }));
+
+      toast({
+        title: "Success",
+        description: "Narrative associations updated successfully"
+      });
+
+      setNarrativesDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating narrative associations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update narrative associations",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {entries.map(entry => {
+      {initialEntries.map(entry => {
         const { content } = parseContent(entry.content);
         return (
           <Card key={entry.id} className="overflow-hidden">
@@ -181,6 +440,18 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
               <div className="flex justify-between items-start">
                 <CardTitle className="text-xl">{entry.title}</CardTitle>
                 <div className="flex items-center space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleManageNarratives(entry)}
+                    className="text-muted-foreground hover:text-primary"
+                    title={narrativeStatus[entry.id] ? "Manage narratives (entry is in narratives)" : "Manage narratives"}
+                  >
+                    <Bookmark
+                      className="h-5 w-5"
+                      fill={narrativeStatus[entry.id] ? "currentColor" : "none"}
+                    />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -280,6 +551,69 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
               Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Narratives Dialog */}
+      <Dialog open={narrativesDialogOpen} onOpenChange={setNarrativesDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manage Narratives for "{selectedEntry?.title}"</DialogTitle>
+            <DialogDescription>
+              Select the narratives you want to associate with this journal entry.
+              Narratives with a checkmark are automatically associated based on tags.
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingNarratives ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <>
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-2">
+                  {narratives.map((narrative) => (
+                    <div
+                      key={narrative.id}
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded-md",
+                        narrative.isSmartAssociated ? "bg-muted/50" : "hover:bg-muted"
+                      )}
+                    >
+                      <Checkbox
+                        id={narrative.id}
+                        checked={narrative.isSelected}
+                        onCheckedChange={() => handleNarrativeToggle(narrative.id)}
+                        disabled={narrative.isSmartAssociated}
+                      />
+                      <label
+                        htmlFor={narrative.id}
+                        className="flex-1 cursor-pointer"
+                      >
+                        <div className="font-medium">{narrative.title}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {format(new Date(narrative.created_at), 'PPP')}
+                          {narrative.isSmartAssociated && (
+                            <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                              Smart Associated
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              <div className="flex justify-end space-x-2 mt-4">
+                <Button variant="outline" onClick={() => setNarrativesDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveNarratives}>
+                  Save Changes
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
