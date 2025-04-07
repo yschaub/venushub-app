@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import {
@@ -67,6 +67,7 @@ const AdminEvents = () => {
     const [allSystemTags, setAllSystemTags] = useState<SystemTag[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+    const [connectionModalSearch, setConnectionModalSearch] = useState("");
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selectedEventForConnection, setSelectedEventForConnection] = useState<Event | null>(null);
     const [tagSearchQuery, setTagSearchQuery] = useState("");
@@ -74,12 +75,10 @@ const AdminEvents = () => {
     const [isNewEventModalOpen, setIsNewEventModalOpen] = useState(false);
     const [isDeleteEventModalOpen, setIsDeleteEventModalOpen] = useState(false);
     const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
-    const [newEvent, setNewEvent] = useState({
-        title: "",
-        date: "",
-        primary_event: false,
-        tags: [] as string[],
-    });
+    const newEventTitleRef = useRef<HTMLInputElement>(null);
+    const newEventDateRef = useRef<HTMLInputElement>(null);
+    const newEventPrimaryRef = useRef<HTMLInputElement>(null);
+    const [newEventTags, setNewEventTags] = useState<string[]>([]);
     const { toast } = useToast();
 
     const fetchEvents = async () => {
@@ -268,15 +267,18 @@ const AdminEvents = () => {
         }
     };
 
-    const createEvent = async () => {
+    const handleNewEventSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newEventTitleRef.current || !newEventDateRef.current) return;
+
         try {
             const { data, error } = await supabase
                 .from('events')
                 .insert([{
-                    title: newEvent.title,
-                    date: newEvent.date,
-                    primary_event: newEvent.primary_event,
-                    tags: newEvent.tags,
+                    title: newEventTitleRef.current.value,
+                    date: newEventDateRef.current.value,
+                    primary_event: newEventPrimaryRef.current?.checked || false,
+                    tags: newEventTags,
                 }])
                 .select()
                 .single();
@@ -300,12 +302,10 @@ const AdminEvents = () => {
             setAllEvents(prevEvents => [...prevEvents, newEventData]);
 
             // Reset the form
-            setNewEvent({
-                title: "",
-                date: "",
-                primary_event: false,
-                tags: [],
-            });
+            if (newEventTitleRef.current) newEventTitleRef.current.value = '';
+            if (newEventDateRef.current) newEventDateRef.current.value = '';
+            if (newEventPrimaryRef.current) newEventPrimaryRef.current.checked = false;
+            setNewEventTags([]);
             setIsNewEventModalOpen(false);
 
             toast({
@@ -389,6 +389,21 @@ const AdminEvents = () => {
         });
         setEvents(filtered);
     }, [searchQuery, allEvents]);
+
+    // Filter events for connection modal
+    const getFilteredEventsForConnection = () => {
+        if (!connectionModalSearch.trim()) {
+            return allEvents.filter(ev => ev.id !== selectedEventForConnection?.id);
+        }
+
+        const query = connectionModalSearch.toLowerCase();
+        return allEvents.filter(event => {
+            if (event.id === selectedEventForConnection?.id) return false;
+            const titleMatch = event.title.toLowerCase().includes(query);
+            const dateMatch = format(new Date(event.date), 'MMMM d, yyyy').toLowerCase().includes(query);
+            return titleMatch || dateMatch;
+        });
+    };
 
     const toggleExpand = (eventId: string) => {
         setEvents(events.map(event =>
@@ -999,39 +1014,37 @@ const AdminEvents = () => {
                         <Input
                             placeholder="Search events..."
                             className="pl-8"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            value={connectionModalSearch}
+                            onChange={(e) => setConnectionModalSearch(e.target.value)}
                         />
                     </div>
                     <ScrollArea className="h-[200px]">
                         <div className="space-y-2">
-                            {events
-                                .filter(ev => ev.id !== selectedEventForConnection?.id)
-                                .map(ev => (
-                                    <div
-                                        key={ev.id}
-                                        className="flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer"
-                                        onClick={() => {
-                                            if (selectedEventForConnection) {
-                                                addConnection(selectedEventForConnection.id, ev.id);
-                                                setSelectedEventForConnection(null);
-                                                setSearchQuery("");
-                                            }
-                                        }}
-                                    >
-                                        <span>{ev.title}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                            {format(new Date(ev.date), 'MMM d, yyyy')}
-                                        </span>
-                                    </div>
-                                ))}
+                            {getFilteredEventsForConnection().map(ev => (
+                                <div
+                                    key={ev.id}
+                                    className="flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer"
+                                    onClick={() => {
+                                        if (selectedEventForConnection) {
+                                            addConnection(selectedEventForConnection.id, ev.id);
+                                            setSelectedEventForConnection(null);
+                                            setConnectionModalSearch("");
+                                        }
+                                    }}
+                                >
+                                    <span>{ev.title}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {format(new Date(ev.date), 'MMM d, yyyy')}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
                     </ScrollArea>
                     <DialogFooter>
                         <Button
                             variant="outline"
                             onClick={() => {
-                                setSearchQuery("");
+                                setConnectionModalSearch("");
                                 setSelectedEventForConnection(null);
                             }}
                         >
@@ -1050,29 +1063,31 @@ const AdminEvents = () => {
                             Fill in the details to create a new event
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <form onSubmit={handleNewEventSubmit} className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Event Title</label>
-                            <Input
+                            <input
+                                type="text"
+                                ref={newEventTitleRef}
                                 placeholder="Enter event title"
-                                value={newEvent.title}
-                                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
                             />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Event Date</label>
-                            <Input
+                            <input
                                 type="date"
-                                value={newEvent.date}
-                                onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                                ref={newEventDateRef}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
                             />
                         </div>
                         <div className="flex items-center space-x-2">
                             <input
                                 type="checkbox"
+                                ref={newEventPrimaryRef}
                                 id="primary_event"
-                                checked={newEvent.primary_event}
-                                onChange={(e) => setNewEvent({ ...newEvent, primary_event: e.target.checked })}
                                 className="h-4 w-4 rounded border-gray-300"
                             />
                             <label htmlFor="primary_event" className="text-sm font-medium">
@@ -1097,16 +1112,17 @@ const AdminEvents = () => {
                                             key={tag.id}
                                             className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
                                             onClick={() => {
-                                                const newTags = newEvent.tags.includes(tag.id)
-                                                    ? newEvent.tags.filter(id => id !== tag.id)
-                                                    : [...newEvent.tags, tag.id];
-                                                setNewEvent({ ...newEvent, tags: newTags });
+                                                setNewEventTags(prev =>
+                                                    prev.includes(tag.id)
+                                                        ? prev.filter(id => id !== tag.id)
+                                                        : [...prev, tag.id]
+                                                );
                                             }}
                                         >
                                             <input
                                                 type="checkbox"
                                                 id={`tag-${tag.id}`}
-                                                checked={newEvent.tags.includes(tag.id)}
+                                                checked={newEventTags.includes(tag.id)}
                                                 readOnly
                                                 className="h-4 w-4 rounded border-gray-300 pointer-events-none"
                                             />
@@ -1123,18 +1139,19 @@ const AdminEvents = () => {
                                 </div>
                             </ScrollArea>
                         </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsNewEventModalOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button onClick={createEvent}>
-                            Create Event
-                        </Button>
-                    </DialogFooter>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsNewEventModalOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit">
+                                Create Event
+                            </Button>
+                        </DialogFooter>
+                    </form>
                 </DialogContent>
             </Dialog>
 
