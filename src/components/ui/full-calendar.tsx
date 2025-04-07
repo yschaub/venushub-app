@@ -643,9 +643,15 @@ const getDaysInMonth = (date: Date) => {
     let currentDate = startOfWeekForMonth;
     const calendar = [];
 
-    while (calendar.length < 42) {
+    // Add days until we complete the last week of the current month
+    while (calendar.length < 35) { // 5 weeks maximum
         calendar.push(new Date(currentDate));
         currentDate = addDays(currentDate, 1);
+
+        // Stop if we've completed the last week of the current month
+        if (currentDate.getMonth() !== date.getMonth() && currentDate.getDay() === 0) {
+            break;
+        }
     }
 
     return calendar;
