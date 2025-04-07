@@ -45,28 +45,22 @@ export type Database = {
       events: {
         Row: {
           date: string
-          end_date: string
           id: string
           primary_event: boolean
-          start_date: string
           tags: string[] | null
           title: string
         }
         Insert: {
           date: string
-          end_date: string
           id?: string
           primary_event?: boolean
-          start_date: string
           tags?: string[] | null
           title: string
         }
         Update: {
           date?: string
-          end_date?: string
           id?: string
           primary_event?: boolean
-          start_date?: string
           tags?: string[] | null
           title?: string
         }
@@ -347,6 +341,7 @@ export type Database = {
         | "Direction"
         | "Cycle"
         | "Houses"
+        | "TIME"
     }
     CompositeTypes: {
       [_ in never]: never
