@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -391,15 +390,15 @@ const CalendarMonthView = () => {
                                     <div
                                         key={event.id}
                                         className={cn(
-                                            "px-2 py-1 rounded-md text-sm flex items-center mb-1 border shadow-sm hover:shadow-md transition-shadow",
+                                            event.primary_event
+                                                ? "px-2 py-1 rounded-md text-sm flex items-center mb-1 border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                                                : "px-2 text-xs text-muted-foreground mb-1",
                                             event.className
                                         )}
-                                        onClick={() => onEventClick?.(event)}
+                                        onClick={event.primary_event ? () => onEventClick?.(event) : undefined}
                                     >
                                         <span className="flex-1 text-foreground">
-                                            {event.title.length > 24
-                                                ? `${event.title.substring(0, 24)}...`
-                                                : event.title}
+                                            {event.title}
                                         </span>
                                     </div>
                                 );
