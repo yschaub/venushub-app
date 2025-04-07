@@ -42,8 +42,6 @@ interface Event {
     id: string;
     title: string;
     date: string;
-    start_date: string;
-    end_date: string;
     primary_event: boolean;
     tags: string[] | null;
     connectedEvents?: ConnectedEvent[];
@@ -66,9 +64,22 @@ const AdminEvents = () => {
     const [events, setEvents] = useState<Event[]>([]);
     const [allEvents, setAllEvents] = useState<Event[]>([]); // Store all events for filtering
     const [tags, setTags] = useState<Record<string, SystemTag>>({});
+    const [allSystemTags, setAllSystemTags] = useState<SystemTag[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+    const [selectedEventForConnection, setSelectedEventForConnection] = useState<Event | null>(null);
+    const [tagSearchQuery, setTagSearchQuery] = useState("");
+    const [tempSelectedTags, setTempSelectedTags] = useState<string[]>([]);
+    const [isNewEventModalOpen, setIsNewEventModalOpen] = useState(false);
+    const [isDeleteEventModalOpen, setIsDeleteEventModalOpen] = useState(false);
+    const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
+    const [newEvent, setNewEvent] = useState({
+        title: "",
+        date: "",
+        primary_event: false,
+        tags: [] as string[],
+    });
     const { toast } = useToast();
 
     const fetchEvents = async () => {
@@ -90,41 +101,35 @@ const AdminEvents = () => {
                 return;
             }
 
-            // Collect all unique tag IDs across all events
-            const tagIds = new Set<string>();
-            eventsData?.forEach(event => {
-                if (event.tags && event.tags.length > 0) {
-                    event.tags.forEach(tagId => tagIds.add(tagId));
-                }
-            });
+            // Fetch all system tags at once
+            const { data: allTagsData, error: tagsError } = await supabase
+                .from('system_tags')
+                .select('*')
+                .order('name');
 
-            // Fetch tag details if there are any tags
-            if (tagIds.size > 0) {
-                const { data: tagsData, error: tagsError } = await supabase
-                    .from('system_tags')
-                    .select('*')
-                    .in('id', Array.from(tagIds));
-
-                if (tagsError) {
-                    console.error('Error fetching tags:', tagsError);
-                    toast({
-                        variant: "destructive",
-                        title: "Error fetching tags",
-                        description: tagsError.message
-                    });
-                } else {
-                    // Create a map of tag ID to tag details
-                    const tagsMap = {};
-                    tagsData?.forEach(tag => {
-                        tagsMap[tag.id] = tag;
-                    });
-                    setTags(tagsMap);
-                }
+            if (tagsError) {
+                console.error('Error fetching tags:', tagsError);
+                toast({
+                    variant: "destructive",
+                    title: "Error fetching tags",
+                    description: tagsError.message
+                });
+            } else {
+                // Create a map of tag ID to tag details
+                const tagsMap: Record<string, SystemTag> = {};
+                allTagsData?.forEach(tag => {
+                    tagsMap[tag.id] = tag;
+                });
+                setTags(tagsMap);
             }
 
             // Convert DB events to our Event interface with empty connectedEvents arrays
             const typedEvents: Event[] = eventsData?.map(event => ({
-                ...event,
+                id: event.id,
+                title: event.title,
+                date: event.date,
+                primary_event: event.primary_event,
+                tags: event.tags,
                 connectedEvents: [],
                 isExpanded: false
             })) || [];
@@ -202,8 +207,171 @@ const AdminEvents = () => {
         }
     };
 
+    const fetchSystemTags = async () => {
+        try {
+            const { data: tagsData, error: tagsError } = await supabase
+                .from('system_tags')
+                .select('*')
+                .order('name');
+
+            if (tagsError) {
+                console.error('Error fetching system tags:', tagsError);
+                toast({
+                    variant: "destructive",
+                    title: "Error fetching tags",
+                    description: tagsError.message
+                });
+                return;
+            }
+
+            setAllSystemTags(tagsData || []);
+        } catch (error) {
+            console.error('Error in fetchSystemTags:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to load system tags"
+            });
+        }
+    };
+
+    const updateEventTags = async (eventId: string, newTags: string[]) => {
+        try {
+            const { error } = await supabase
+                .from('events')
+                .update({ tags: newTags })
+                .eq('id', eventId);
+
+            if (error) {
+                throw error;
+            }
+
+            setEvents(prevEvents =>
+                prevEvents.map(event =>
+                    event.id === eventId
+                        ? { ...event, tags: newTags }
+                        : event
+                )
+            );
+
+            toast({
+                title: "Success",
+                description: "Tags updated successfully"
+            });
+        } catch (error) {
+            console.error('Error updating event tags:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update tags"
+            });
+        }
+    };
+
+    const createEvent = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('events')
+                .insert([{
+                    title: newEvent.title,
+                    date: newEvent.date,
+                    primary_event: newEvent.primary_event,
+                    tags: newEvent.tags,
+                }])
+                .select()
+                .single();
+
+            if (error) {
+                throw error;
+            }
+
+            // Add the new event to the list
+            const newEventData: Event = {
+                id: data.id,
+                title: data.title,
+                date: data.date,
+                primary_event: data.primary_event,
+                tags: data.tags,
+                connectedEvents: [],
+                isExpanded: false
+            };
+
+            setEvents(prevEvents => [...prevEvents, newEventData]);
+            setAllEvents(prevEvents => [...prevEvents, newEventData]);
+
+            // Reset the form
+            setNewEvent({
+                title: "",
+                date: "",
+                primary_event: false,
+                tags: [],
+            });
+            setIsNewEventModalOpen(false);
+
+            toast({
+                title: "Success",
+                description: "Event created successfully"
+            });
+        } catch (error) {
+            console.error('Error creating event:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to create event"
+            });
+        }
+    };
+
+    const deleteEvent = async () => {
+        if (!eventToDelete) return;
+
+        try {
+            // First delete all relationships
+            const { error: relationshipsError } = await supabase
+                .from('event_relationships')
+                .delete()
+                .or(`event_id.eq.${eventToDelete.id},related_event_id.eq.${eventToDelete.id}`);
+
+            if (relationshipsError) {
+                throw relationshipsError;
+            }
+
+            // Then delete the event
+            const { error: eventError } = await supabase
+                .from('events')
+                .delete()
+                .eq('id', eventToDelete.id);
+
+            if (eventError) {
+                throw eventError;
+            }
+
+            // Update local state
+            setEvents(prevEvents => prevEvents.filter(event => event.id !== eventToDelete.id));
+            setAllEvents(prevEvents => prevEvents.filter(event => event.id !== eventToDelete.id));
+
+            // Reset state
+            setEventToDelete(null);
+            setIsDeleteEventModalOpen(false);
+            setSearchQuery("");
+
+            toast({
+                title: "Success",
+                description: "Event deleted successfully"
+            });
+        } catch (error) {
+            console.error('Error deleting event:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to delete event"
+            });
+        }
+    };
+
     useEffect(() => {
         fetchEvents();
+        fetchSystemTags();
     }, []);
 
     // Filter events based on search query
@@ -338,6 +506,56 @@ const AdminEvents = () => {
         setEvents(allEvents);
     };
 
+    const filteredTags = allSystemTags.filter(tag =>
+        tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()) ||
+        tag.category.toLowerCase().includes(tagSearchQuery.toLowerCase())
+    );
+
+    const handleOpenTagDialog = (event: Event) => {
+        setSelectedEvent(event);
+        setTempSelectedTags(event.tags || []);
+        setTagSearchQuery("");
+    };
+
+    const handleSaveTags = async (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent row expansion
+        if (!selectedEvent) return;
+
+        try {
+            const { error } = await supabase
+                .from('events')
+                .update({ tags: tempSelectedTags })
+                .eq('id', selectedEvent.id);
+
+            if (error) {
+                throw error;
+            }
+
+            setEvents(prevEvents =>
+                prevEvents.map(event =>
+                    event.id === selectedEvent.id
+                        ? { ...event, tags: tempSelectedTags }
+                        : event
+                )
+            );
+
+            toast({
+                title: "Success",
+                description: "Tags updated successfully"
+            });
+        } catch (error) {
+            console.error('Error updating event tags:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update tags"
+            });
+        } finally {
+            setSelectedEvent(null);
+            setTempSelectedTags([]);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -350,15 +568,35 @@ const AdminEvents = () => {
         <div className="container mx-auto py-10">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">All Events</h1>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={fetchEvents}
-                    className="flex items-center gap-1"
-                >
-                    <Calendar className="h-4 w-4" />
-                    Refresh Events
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={fetchEvents}
+                        className="flex items-center gap-1"
+                    >
+                        <Calendar className="h-4 w-4" />
+                        Refresh Events
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsDeleteEventModalOpen(true)}
+                        className="flex items-center gap-1"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Delete an Event
+                    </Button>
+                    <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setIsNewEventModalOpen(true)}
+                        className="flex items-center gap-1"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Add New Event
+                    </Button>
+                </div>
             </div>
             <div className="relative mb-6">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -396,16 +634,20 @@ const AdminEvents = () => {
                             <React.Fragment key={event.id}>
                                 <TableRow
                                     className={cn(
-                                        "cursor-pointer hover:bg-muted/80",
+                                        "hover:bg-muted/80",
                                         event.isExpanded && "bg-muted/50"
                                     )}
-                                    onClick={() => toggleExpand(event.id)}
                                 >
                                     <TableCell className="px-2">
                                         {event.connectedEvents && event.connectedEvents.length > 0 ? (
-                                            event.isExpanded ?
-                                                <ChevronDown className="h-4 w-4 text-muted-foreground" /> :
-                                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                            <button
+                                                onClick={() => toggleExpand(event.id)}
+                                                className="hover:bg-muted/80 p-1 rounded"
+                                            >
+                                                {event.isExpanded ?
+                                                    <ChevronDown className="h-4 w-4 text-muted-foreground" /> :
+                                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                            </button>
                                         ) : (
                                             <span className="w-4 block"></span>
                                         )}
@@ -418,24 +660,211 @@ const AdminEvents = () => {
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {event.tags?.map((tagId) => (
-                                                <Badge
-                                                    key={tagId}
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "border-0 text-xs rounded-md px-2 py-0.5",
-                                                        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
-                                                    )}
-                                                >
-                                                    {tags[tagId]?.name || tagId}
-                                                </Badge>
-                                            ))}
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                            {event.tags && event.tags.length > 0 ? (
+                                                <>
+                                                    {event.tags.map((tagId) => (
+                                                        <Badge
+                                                            key={tagId}
+                                                            variant="outline"
+                                                            className={cn(
+                                                                "border-0 text-xs rounded-md px-2 py-0.5",
+                                                                "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                                                            )}
+                                                        >
+                                                            {tags[tagId]?.name || tagId}
+                                                        </Badge>
+                                                    ))}
+                                                    <Dialog>
+                                                        <DialogTrigger asChild>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-6 px-2 text-xs text-muted-foreground"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleOpenTagDialog(event);
+                                                                }}
+                                                            >
+                                                                Edit tags
+                                                            </Button>
+                                                        </DialogTrigger>
+                                                        <DialogContent onClick={(e) => e.stopPropagation()} className="max-w-2xl">
+                                                            <DialogHeader>
+                                                                <DialogTitle>Manage Tags for {event.title}</DialogTitle>
+                                                                <DialogDescription>
+                                                                    Select or search for tags to add to this event
+                                                                </DialogDescription>
+                                                            </DialogHeader>
+                                                            <div className="space-y-4">
+                                                                <div className="relative">
+                                                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                                                    <Input
+                                                                        placeholder="Search tags by name or category..."
+                                                                        className="pl-8"
+                                                                        value={tagSearchQuery}
+                                                                        onChange={(e) => setTagSearchQuery(e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <ScrollArea className="h-[400px] pr-4">
+                                                                    <div className="grid gap-2">
+                                                                        {filteredTags.map((tag) => (
+                                                                            <div
+                                                                                key={tag.id}
+                                                                                className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    const newTags = tempSelectedTags.includes(tag.id)
+                                                                                        ? tempSelectedTags.filter(id => id !== tag.id)
+                                                                                        : [...tempSelectedTags, tag.id];
+                                                                                    setTempSelectedTags(newTags);
+                                                                                }}
+                                                                            >
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    id={`tag-${tag.id}`}
+                                                                                    checked={tempSelectedTags.includes(tag.id)}
+                                                                                    readOnly
+                                                                                    className="h-4 w-4 rounded border-gray-300 pointer-events-none"
+                                                                                />
+                                                                                <div className="flex flex-col flex-1">
+                                                                                    <span className="text-sm font-medium">
+                                                                                        {tag.name}
+                                                                                    </span>
+                                                                                    <span className="text-xs text-muted-foreground">
+                                                                                        {tag.category}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </ScrollArea>
+                                                            </div>
+                                                            <DialogFooter>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    onClick={() => {
+                                                                        setSelectedEvent(null);
+                                                                        setTempSelectedTags([]);
+                                                                    }}
+                                                                >
+                                                                    Cancel
+                                                                </Button>
+                                                                <Button onClick={handleSaveTags}>
+                                                                    Save Changes
+                                                                </Button>
+                                                            </DialogFooter>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                </>
+                                            ) : (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 px-2 text-xs text-muted-foreground"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenTagDialog(event);
+                                                            }}
+                                                        >
+                                                            Add tags
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent onClick={(e) => e.stopPropagation()}>
+                                                        <DialogHeader>
+                                                            <DialogTitle>Manage Tags for {event.title}</DialogTitle>
+                                                            <DialogDescription>
+                                                                Select or search for tags to add to this event
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <div className="space-y-4">
+                                                            <div className="relative">
+                                                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                                                <Input
+                                                                    placeholder="Search tags by name or category..."
+                                                                    className="pl-8"
+                                                                    value={tagSearchQuery}
+                                                                    onChange={(e) => setTagSearchQuery(e.target.value)}
+                                                                />
+                                                            </div>
+                                                            <ScrollArea className="h-[400px] pr-4">
+                                                                <div className="grid gap-2">
+                                                                    {filteredTags.map((tag) => (
+                                                                        <div
+                                                                            key={tag.id}
+                                                                            className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const newTags = tempSelectedTags.includes(tag.id)
+                                                                                    ? tempSelectedTags.filter(id => id !== tag.id)
+                                                                                    : [...tempSelectedTags, tag.id];
+                                                                                setTempSelectedTags(newTags);
+                                                                            }}
+                                                                        >
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                id={`tag-${tag.id}`}
+                                                                                checked={tempSelectedTags.includes(tag.id)}
+                                                                                readOnly
+                                                                                className="h-4 w-4 rounded border-gray-300 pointer-events-none"
+                                                                            />
+                                                                            <div className="flex flex-col flex-1">
+                                                                                <span className="text-sm font-medium">
+                                                                                    {tag.name}
+                                                                                </span>
+                                                                                <span className="text-xs text-muted-foreground">
+                                                                                    {tag.category}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </ScrollArea>
+                                                        </div>
+                                                        <DialogFooter>
+                                                            <Button
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setSelectedEvent(null);
+                                                                    setTempSelectedTags([]);
+                                                                }}
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                            <Button onClick={handleSaveTags}>
+                                                                Save Changes
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <span className="text-sm">
-                                            {event.connectedEvents?.length || 0} connected events
+                                            {event.connectedEvents && event.connectedEvents.length > 0 ? (
+                                                <button
+                                                    onClick={() => toggleExpand(event.id)}
+                                                    className="hover:underline hover:text-muted-foreground"
+                                                >
+                                                    {`${event.connectedEvents.length} connected events`}
+                                                </button>
+                                            ) : (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 px-2 text-xs text-muted-foreground"
+                                                    onClick={() => {
+                                                        setSelectedEventForConnection(event);
+                                                        setSearchQuery("");
+                                                    }}
+                                                >
+                                                    <Plus className="h-3 w-3 mr-1" />
+                                                    Add connection
+                                                </Button>
+                                            )}
                                         </span>
                                     </TableCell>
                                 </TableRow>
@@ -555,6 +984,226 @@ const AdminEvents = () => {
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Add Connection Dialog */}
+            <Dialog open={selectedEventForConnection !== null}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add Connection</DialogTitle>
+                        <DialogDescription>
+                            Search for an event to connect with "{selectedEventForConnection?.title}"
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search events..."
+                            className="pl-8"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <ScrollArea className="h-[200px]">
+                        <div className="space-y-2">
+                            {events
+                                .filter(ev => ev.id !== selectedEventForConnection?.id)
+                                .map(ev => (
+                                    <div
+                                        key={ev.id}
+                                        className="flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer"
+                                        onClick={() => {
+                                            if (selectedEventForConnection) {
+                                                addConnection(selectedEventForConnection.id, ev.id);
+                                                setSelectedEventForConnection(null);
+                                                setSearchQuery("");
+                                            }
+                                        }}
+                                    >
+                                        <span>{ev.title}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {format(new Date(ev.date), 'MMM d, yyyy')}
+                                        </span>
+                                    </div>
+                                ))}
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setSearchQuery("");
+                                setSelectedEventForConnection(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Add New Event Modal */}
+            <Dialog open={isNewEventModalOpen} onOpenChange={setIsNewEventModalOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Create New Event</DialogTitle>
+                        <DialogDescription>
+                            Fill in the details to create a new event
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Event Title</label>
+                            <Input
+                                placeholder="Enter event title"
+                                value={newEvent.title}
+                                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Event Date</label>
+                            <Input
+                                type="date"
+                                value={newEvent.date}
+                                onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="primary_event"
+                                checked={newEvent.primary_event}
+                                onChange={(e) => setNewEvent({ ...newEvent, primary_event: e.target.checked })}
+                                className="h-4 w-4 rounded border-gray-300"
+                            />
+                            <label htmlFor="primary_event" className="text-sm font-medium">
+                                Primary Event
+                            </label>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Tags</label>
+                            <div className="relative">
+                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search tags..."
+                                    className="pl-8"
+                                    value={tagSearchQuery}
+                                    onChange={(e) => setTagSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <ScrollArea className="h-[200px] pr-4">
+                                <div className="grid gap-2">
+                                    {filteredTags.map((tag) => (
+                                        <div
+                                            key={tag.id}
+                                            className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
+                                            onClick={() => {
+                                                const newTags = newEvent.tags.includes(tag.id)
+                                                    ? newEvent.tags.filter(id => id !== tag.id)
+                                                    : [...newEvent.tags, tag.id];
+                                                setNewEvent({ ...newEvent, tags: newTags });
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                id={`tag-${tag.id}`}
+                                                checked={newEvent.tags.includes(tag.id)}
+                                                readOnly
+                                                className="h-4 w-4 rounded border-gray-300 pointer-events-none"
+                                            />
+                                            <div className="flex flex-col flex-1">
+                                                <span className="text-sm font-medium">
+                                                    {tag.name}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {tag.category}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsNewEventModalOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={createEvent}>
+                            Create Event
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Event Dialog */}
+            <Dialog open={isDeleteEventModalOpen} onOpenChange={setIsDeleteEventModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Event</DialogTitle>
+                        <DialogDescription>
+                            Search for an event to delete. This action will permanently remove the event and all its relationships.
+                            <div className="mt-2 p-3 bg-destructive/10 text-destructive rounded-md">
+                                <p className="font-medium">⚠️ Proceed with extreme caution!</p>
+                                <p className="text-sm mt-1">
+                                    Users will no longer be able to journal about this event, and the only way to find their journal entries will be via the "Journal Entries" section.
+                                </p>
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search events..."
+                            className="pl-8"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <ScrollArea className="h-[200px]">
+                        <div className="space-y-2">
+                            {events.map(ev => (
+                                <div
+                                    key={ev.id}
+                                    className={cn(
+                                        "flex items-center justify-between p-2 rounded-md cursor-pointer",
+                                        eventToDelete?.id === ev.id
+                                            ? "bg-destructive/10 text-destructive"
+                                            : "hover:bg-muted"
+                                    )}
+                                    onClick={() => setEventToDelete(ev)}
+                                >
+                                    <span>{ev.title}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {format(new Date(ev.date), 'MMM d, yyyy')}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setEventToDelete(null);
+                                setIsDeleteEventModalOpen(false);
+                                setSearchQuery("");
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={deleteEvent}
+                            disabled={!eventToDelete}
+                        >
+                            Delete Event
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
