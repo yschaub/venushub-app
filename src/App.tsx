@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import AdminEvents from "./pages/AdminEvents";
+import AdminPasswordProtection from "./components/AdminPasswordProtection";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,7 +29,14 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Auth />} />
           <Route path="/dashboard/*" element={<Dashboard />} />
-          <Route path="/admin" element={<AdminEvents />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminPasswordProtection>
+                <AdminEvents />
+              </AdminPasswordProtection>
+            }
+          />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
