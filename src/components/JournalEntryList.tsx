@@ -560,9 +560,7 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
           <DialogHeader>
             <DialogTitle>Manage Narratives for "{selectedEntry?.title}"</DialogTitle>
             <DialogDescription>
-              Select the narratives you want to associate with this journal entry.
-              Narratives with a checkmark are automatically associated based on tags.
-            </DialogDescription>
+              Select the narratives you want to associate with this journal entry.            </DialogDescription>
           </DialogHeader>
           {isLoadingNarratives ? (
             <div className="flex justify-center py-8">
@@ -595,7 +593,7 @@ const JournalEntryList: React.FC<JournalEntryListProps> = ({
                           {format(new Date(narrative.created_at), 'PPP')}
                           {narrative.isSmartAssociated && (
                             <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                              Smart Associated
+                              Smart Narrative
                             </span>
                           )}
                         </div>
