@@ -386,6 +386,10 @@ const CalendarMonthView = () => {
                             </span>
 
                             {currentEvents.map((event) => {
+                                const displayTitle = event.primary_event && event.title.length > 24
+                                    ? event.title.substring(0, 24) + '...'
+                                    : event.title;
+
                                 return (
                                     <div
                                         key={event.id}
@@ -398,7 +402,7 @@ const CalendarMonthView = () => {
                                         onClick={event.primary_event ? () => onEventClick?.(event) : undefined}
                                     >
                                         <span className="flex-1 text-foreground">
-                                            {event.title}
+                                            {displayTitle}
                                         </span>
                                     </div>
                                 );
