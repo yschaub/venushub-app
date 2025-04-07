@@ -46,8 +46,7 @@ interface Event {
 interface RelatedEvent {
   id: string;
   title: string;
-  start_date: string;
-  end_date: string;
+  date: string;
 }
 
 interface SystemTag {
@@ -226,8 +225,6 @@ const CalendarView = () => {
           journalId: journalId,
           tags: event.tags,
           primary_event: event.primary_event,
-          start_date: event.start_date,
-          end_date: event.end_date,
           className: event.primary_event
             ? (hasJournal
               ? "bg-green-100 border-green-300 cursor-pointer"
@@ -406,7 +403,7 @@ const CalendarView = () => {
 
       const { data: relatedEventsData, error: relatedEventsError } = await supabase
         .from('events')
-        .select('id, title, start_date, end_date')
+        .select('id, title, date')
         .in('id', relatedEventIds);
 
       if (relatedEventsError) {
