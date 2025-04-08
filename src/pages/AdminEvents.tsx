@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 
 interface Event {
     id: string;
@@ -370,6 +371,47 @@ const AdminEvents = () => {
         }
     };
 
+    const handleEventTypeChange = async (eventId: string, newType: boolean) => {
+        try {
+            const { error } = await supabase
+                .from('events')
+                .update({ primary_event: newType })
+                .eq('id', eventId);
+
+            if (error) {
+                throw error;
+            }
+
+            // Update the local state
+            setEvents(prevEvents =>
+                prevEvents.map(event =>
+                    event.id === eventId
+                        ? { ...event, primary_event: newType }
+                        : event
+                )
+            );
+            setAllEvents(prevEvents =>
+                prevEvents.map(event =>
+                    event.id === eventId
+                        ? { ...event, primary_event: newType }
+                        : event
+                )
+            );
+
+            toast({
+                title: "Success",
+                description: "Event type updated successfully"
+            });
+        } catch (error) {
+            console.error('Error updating event type:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update event type"
+            });
+        }
+    };
+
     useEffect(() => {
         fetchEvents();
         fetchSystemTags();
@@ -692,9 +734,14 @@ const AdminEvents = () => {
                                     <TableCell className="font-medium">{event.title}</TableCell>
                                     <TableCell>{format(new Date(event.date), 'MMMM d, yyyy')}</TableCell>
                                     <TableCell>
-                                        <Badge variant={event.primary_event ? "default" : "outline"}>
+                                        <Button
+                                            variant={event.primary_event ? "default" : "outline"}
+                                            size="sm"
+                                            className="h-6 px-2 text-xs"
+                                            onClick={() => handleEventTypeChange(event.id, !event.primary_event)}
+                                        >
                                             {event.primary_event ? 'Primary' : 'Secondary'}
-                                        </Badge>
+                                        </Button>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1.5 items-center">
