@@ -56,7 +56,10 @@ interface SystemTag {
 }
 
 interface EventCache {
-  [monthKey: string]: CalendarEvent[];
+  events: {
+    [key: string]: CalendarEvent[];
+  };
+  lastUpdated?: string;
 }
 
 interface CalendarEvent extends BaseCalendarEvent {
@@ -133,7 +136,7 @@ const CalendarView = () => {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [eventTags, setEventTags] = useState<SystemTag[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [eventCache, setEventCache] = useState<EventCache>({});
+  const [eventCache, setEventCache] = useState<EventCache>({ events: {} });
   const [loadingMonth, setLoadingMonth] = useState(false);
   const [journalEntry, setJournalEntry] = useState<JournalEntry | null>(null);
   const [loadingJournal, setLoadingJournal] = useState(false);
@@ -163,56 +166,67 @@ const CalendarView = () => {
   const fetchEventsForMonth = useCallback(async (date: Date) => {
     const monthKey = getMonthKey(date);
 
-    if (eventCache[monthKey]) {
-      setEvents(eventCache[monthKey]);
-      setLoading(false);
-      return;
+    // Check if we have cached data that's less than 5 minutes old
+    if (eventCache.events[monthKey] && eventCache.lastUpdated) {
+      const lastUpdated = new Date(eventCache.lastUpdated);
+      const now = new Date();
+      const minutesDiff = (now.getTime() - lastUpdated.getTime()) / (1000 * 60);
+
+      if (minutesDiff < 5) {
+        setEvents(eventCache.events[monthKey]);
+        setLoading(false);
+        return;
+      }
     }
 
     setLoadingMonth(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        toast.error("Authentication error. Please try logging in again.");
+        return;
+      }
       if (!user) {
-        console.error('No authenticated user found');
+        toast.error("Please log in to view events");
         return;
       }
 
       const firstDay = startOfMonth(date);
       const lastDay = endOfMonth(date);
 
-      console.log(`Fetching events from ${format(firstDay, 'yyyy-MM-dd')} to ${format(lastDay, 'yyyy-MM-dd')}`);
+      // Fetch events and journal entries in parallel without abort signal
+      const [eventsResponse, journalResponse] = await Promise.all([
+        supabase
+          .from('events')
+          .select('*')
+          .or(`date.gte.${format(firstDay, 'yyyy-MM-dd')},date.lte.${format(lastDay, 'yyyy-MM-dd')}`)
+          .order('date', { ascending: true }),
+        supabase
+          .from('journal_entries')
+          .select('id, event_id')
+          .eq('user_id', user.id)
+          .not('event_id', 'is', null)
+      ]);
 
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('events')
-        .select('*')
-        .or(`date.gte.${format(firstDay, 'yyyy-MM-dd')},date.lte.${format(lastDay, 'yyyy-MM-dd')}`)
-        .order('date', { ascending: true });
-
-      if (eventsError) {
-        console.error('Error fetching events:', eventsError);
-        toast.error("Failed to load events");
+      if (eventsResponse.error) {
+        if (eventsResponse.error.code === 'PGRST116') {
+          toast.error("No events found for this period");
+        } else {
+          toast.error(`Failed to load events: ${eventsResponse.error.message}`);
+        }
         return;
       }
 
-      const eventIds = eventsData.map(event => event.id);
-
-      const { data: journalEntries, error: journalError } = await supabase
-        .from('journal_entries')
-        .select('id, event_id')
-        .eq('user_id', user.id)
-        .in('event_id', eventIds)
-        .not('event_id', 'is', null);
-
-      if (journalError) {
-        console.error('Error fetching journal entries:', journalError);
+      if (journalResponse.error) {
+        // Continue with events even if journal fetch fails
       }
 
       const eventJournalMap = new Map();
-      journalEntries?.forEach(entry => {
+      journalResponse.data?.forEach(entry => {
         eventJournalMap.set(entry.event_id, entry.id);
       });
 
-      const transformedEvents = (eventsData || []).map(event => {
+      const transformedEvents = (eventsResponse.data || []).map(event => {
         const hasJournal = eventJournalMap.has(event.id);
         const journalId = eventJournalMap.get(event.id);
 
@@ -240,16 +254,19 @@ const CalendarView = () => {
         return a.start.getTime() - b.start.getTime();
       });
 
+      // Update cache with timestamp
       setEventCache(prev => ({
         ...prev,
-        [monthKey]: sortedEvents
+        events: {
+          ...prev.events,
+          [monthKey]: sortedEvents
+        },
+        lastUpdated: new Date().toISOString()
       }));
 
       setEvents(sortedEvents);
-      console.log(`Loaded ${sortedEvents.length} events for ${monthKey}`);
     } catch (error) {
-      console.error('Error:', error);
-      toast.error("Failed to load events");
+      toast.error("Failed to load events. Please try refreshing the page.");
     } finally {
       setLoading(false);
       setLoadingMonth(false);
@@ -265,16 +282,16 @@ const CalendarView = () => {
       const nextMonth = addMonths(currentDate, 1);
       const prevMonth = addMonths(currentDate, -1);
 
-      if (!eventCache[getMonthKey(nextMonth)]) {
+      if (!eventCache.events[getMonthKey(nextMonth)]) {
         fetchEventsForMonth(nextMonth);
       }
 
-      if (!eventCache[getMonthKey(prevMonth)]) {
+      if (!eventCache.events[getMonthKey(prevMonth)]) {
         fetchEventsForMonth(prevMonth);
       }
     };
 
-    if (!loading && Object.keys(eventCache).length > 0) {
+    if (!loading && Object.keys(eventCache.events).length > 0) {
       prefetchAdjacentMonths();
     }
   }, [currentDate, eventCache, fetchEventsForMonth, getMonthKey, loading]);
@@ -301,7 +318,6 @@ const CalendarView = () => {
         .single();
 
       if (error) {
-        console.error('Error fetching journal entry:', error);
         return;
       }
 
@@ -329,9 +345,7 @@ const CalendarView = () => {
           .select('*')
           .in('id', tagIds);
 
-        if (tagsError) {
-          console.error('Error fetching journal entry tags:', tagsError);
-        } else {
+        if (!tagsError) {
           setEventTags(tagsData || []);
         }
       } else {
@@ -351,18 +365,15 @@ const CalendarView = () => {
         `)
         .eq('journal_entry_id', journalId);
 
-      if (narrativesError) {
-        console.error('Error fetching narratives:', narrativesError);
-        return;
+      if (!narrativesError) {
+        const narratives = narrativeEntries
+          ?.map(entry => entry.narrative)
+          .filter((narrative): narrative is Narrative => narrative !== null);
+
+        setJournalNarratives(narratives || []);
       }
-
-      const narratives = narrativeEntries
-        ?.map(entry => entry.narrative)
-        .filter((narrative): narrative is Narrative => narrative !== null);
-
-      setJournalNarratives(narratives || []);
     } catch (error) {
-      console.error('Error in fetchJournalEntry:', error);
+      // Silently handle errors for journal entries
     } finally {
       setLoadingJournal(false);
     }
@@ -371,29 +382,25 @@ const CalendarView = () => {
   const fetchRelatedEvents = async (eventId: string) => {
     setLoadingRelatedEvents(true);
     try {
-      const { data: relationships, error: relationshipsError } = await supabase
-        .from('event_relationships')
-        .select('related_event_id')
-        .eq('event_id', eventId);
+      const [relationshipsResponse, inverseRelationshipsResponse] = await Promise.all([
+        supabase
+          .from('event_relationships')
+          .select('related_event_id')
+          .eq('event_id', eventId),
+        supabase
+          .from('event_relationships')
+          .select('event_id')
+          .eq('related_event_id', eventId)
+      ]);
 
-      if (relationshipsError) {
-        console.error('Error fetching event relationships:', relationshipsError);
-        return;
-      }
-
-      const { data: inverseRelationships, error: inverseError } = await supabase
-        .from('event_relationships')
-        .select('event_id')
-        .eq('related_event_id', eventId);
-
-      if (inverseError) {
-        console.error('Error fetching inverse event relationships:', inverseError);
+      if (relationshipsResponse.error || inverseRelationshipsResponse.error) {
+        setRelatedEvents([]);
         return;
       }
 
       const relatedEventIds = [
-        ...(relationships?.map(rel => rel.related_event_id) || []),
-        ...(inverseRelationships?.map(rel => rel.event_id) || [])
+        ...(relationshipsResponse.data?.map(rel => rel.related_event_id) || []),
+        ...(inverseRelationshipsResponse.data?.map(rel => rel.event_id) || [])
       ];
 
       if (relatedEventIds.length === 0) {
@@ -407,14 +414,11 @@ const CalendarView = () => {
         .in('id', relatedEventIds)
         .order('date', { ascending: true });
 
-      if (relatedEventsError) {
-        console.error('Error fetching related events:', relatedEventsError);
-        return;
+      if (!relatedEventsError) {
+        setRelatedEvents(relatedEventsData || []);
       }
-
-      setRelatedEvents(relatedEventsData || []);
     } catch (error) {
-      console.error('Error in fetchRelatedEvents:', error);
+      setRelatedEvents([]);
     } finally {
       setLoadingRelatedEvents(false);
     }
@@ -482,22 +486,9 @@ const CalendarView = () => {
     }
   };
 
-  const handleMonthChange = (date: Date) => {
+  const handleMonthChange = useCallback((date: Date) => {
     setCurrentDate(date);
-
-    const monthKey = getMonthKey(date);
-    if (!eventCache[monthKey]) {
-      fetchEventsForMonth(date);
-    } else {
-      setEvents(eventCache[monthKey]);
-    }
-
-    const nextMonth = addMonths(date, 1);
-    const nextMonthKey = getMonthKey(nextMonth);
-    if (!eventCache[nextMonthKey]) {
-      fetchEventsForMonth(nextMonth);
-    }
-  };
+  }, []);
 
   useEffect(() => {
     if (!hoveredAnnotation || !tooltipRef.current) return;
@@ -574,7 +565,7 @@ const CalendarView = () => {
     }
   }, [location.state?.openEventId, events, loading, currentDate, navigate, handleEventClick]);
 
-  if (loading && !eventCache[getMonthKey(currentDate)]) {
+  if (loading && !eventCache.events[getMonthKey(currentDate)]) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-muted-foreground">Loading calendar...</p>
