@@ -483,7 +483,7 @@ const JournalEntryEditor: React.FC<JournalEntryEditorProps> = ({
   return (
     <div className="flex flex-col md:flex-row gap-6">
       <div className="flex-1">
-        <Card className="p-6">
+        <Card className="bg-white border-none">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="content">Journal Entry</Label>

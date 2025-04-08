@@ -28,7 +28,7 @@ const AnnotationSidebar: React.FC<AnnotationSidebarProps> = ({
   if (annotations.length === 0) {
     return (
       <div className="w-full md:w-[300px]">
-        <Card>
+        <Card className="mt-6">
           <CardHeader>
             <CardTitle>Annotations</CardTitle>
           </CardHeader>
@@ -55,7 +55,7 @@ const AnnotationSidebar: React.FC<AnnotationSidebarProps> = ({
                 key={annotation.id}
                 className="border rounded-md p-3 hover:bg-muted/30 transition-colors"
               >
-                <div 
+                <div
                   className="text-sm mb-2 cursor-pointer"
                   onClick={() => onAnnotationClick && onAnnotationClick(annotation.id)}
                 >
@@ -63,9 +63,9 @@ const AnnotationSidebar: React.FC<AnnotationSidebarProps> = ({
                     {annotation.selected_text}
                   </span>
                 </div>
-                
+
                 <p className="text-sm font-medium mb-2">{annotation.content}</p>
-                
+
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(annotation.created_at), { addSuffix: true })}
