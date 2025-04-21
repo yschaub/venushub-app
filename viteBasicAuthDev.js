@@ -3,7 +3,7 @@
  * Vite dev middleware for HTTP Basic Auth
  * Reads BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD from process.env
  */
-module.exports = function basicAuthDev(req, res, next) {
+const basicAuthDev = function(req, res, next) {
   // Only protect dashboard and admin
   if (!req.url.startsWith('/dashboard') && !req.url.startsWith('/admin')) return next();
 
@@ -32,3 +32,5 @@ module.exports = function basicAuthDev(req, res, next) {
   }
   next();
 };
+
+export default basicAuthDev;
