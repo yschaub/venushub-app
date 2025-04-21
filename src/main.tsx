@@ -9,8 +9,8 @@
  * - This only applies as a frontend measure and is not truly secure for protecting backend endpoints.
  * - You must still keep your real authentication for the app.
  */
-const BASIC_AUTH_USER = "venusadmin";
-const BASIC_AUTH_PASS = "pisces2025";
+const BASIC_AUTH_USER = "admin";
+const BASIC_AUTH_PASS = "lolblock2025";
 function basicAuth() {
   // If already granted in this session, don't prompt again
   if (sessionStorage.getItem("__basic_auth_ok__") === "yes") return;
@@ -29,7 +29,7 @@ function basicAuth() {
       promptBasicAuth();
       return;
     }
-    sessionStorage.setItem("__basic_auth_ok__","yes");
+    sessionStorage.setItem("__basic_auth_ok__", "yes");
   }
 
   promptBasicAuth();
