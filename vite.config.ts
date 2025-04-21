@@ -18,7 +18,6 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     ...(mode === 'development' && {
-      middlewareMode: true,
       setupMiddlewares: (middlewares: any[], server: Server) => {
         // Attach Basic Auth middleware in dev
         server.middlewares.use(basicAuthDev);
