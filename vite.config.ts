@@ -1,29 +1,13 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import basicAuthDev from "./viteBasicAuthDev";
 
-interface Middleware {
-  use: (middleware: any) => void;
-}
-
-interface Server {
-  middlewares: Middleware;
-}
-
+// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    ...(mode === 'development' && {
-      setupMiddlewares: (middlewares: any[], server: Server) => {
-        // Attach Basic Auth middleware in dev
-        server.middlewares.use(basicAuthDev);
-        return middlewares;
-      }
-    }),
   },
   plugins: [
     react(),
