@@ -4,20 +4,16 @@
  * Reads BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD from process.env
  */
 const basicAuthDev = function(req, res, next) {
-  // Only protect dashboard and admin routes
-  if (!req.url || (!req.url.startsWith('/dashboard') && !req.url.startsWith('/admin'))) {
-    return next();
-  }
-  
   // For debugging
   console.log(`Auth checking URL: ${req.url}`);
 
   const username = process.env.BASIC_AUTH_USERNAME;
   const password = process.env.BASIC_AUTH_PASSWORD;
-  
+
+  // If credentials not set, do NOT block, just continue (for developer convenience)
   if (!username || !password) {
     console.error('Error: BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD must be set in env/secrets');
-    return next(); // Continue to avoid blocking development
+    return next();
   }
 
   const auth = req.headers.authorization || '';
@@ -41,3 +37,4 @@ const basicAuthDev = function(req, res, next) {
 };
 
 export default basicAuthDev;
+
